@@ -1,4 +1,83 @@
+# ----- Your originals -----
 /.vscode/
 */outputs/
 **/__pycache__/
+/.venv/
 /venv/
+
+# ----- Virtual envs -----
+.venv/
+venv/
+env/
+env.bak/
+.python-version
+.Python
+
+# ----- Python bytecode/caches -----
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+
+# ----- Build / packaging -----
+build/
+dist/
+eggs/
+*.egg-info/
+.installed.cfg
+*.egg
+pip-wheel-metadata/
+
+# ----- Logs / runs / checkpoints -----
+logs/
+**/*.log
+runs/               # TensorBoard default
+wandb/
+mlruns/
+checkpoints/
+weights/
+**/outputs/**       # stronger catch-all than */outputs/
+*.pth
+*.pt
+*.ckpt
+
+# ----- Notebooks -----
+.ipynb_checkpoints/
+
+# ----- Tools / IDEs -----
+.idea/              # JetBrains
+.vscode/            # VS Code
+.vs/                # Visual Studio
+*.code-workspace
+
+# ----- OS noise -----
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ----- Environment / secrets -----
+.env
+.env.*
+*.env
+*.secret
+*.secrets
+*.key
+*.pem
+
+# ----- Data (keep code under datasets/, ignore raw dumps) -----
+# IMPORTANT: do NOT ignore the whole datasets/ folder since it contains Python modules.
+datasets/**/Data/**           # e.g., datasets/rplandata/Data/...
+datasets/lifulldata/**        # optional: raw LIFULL dumps if you download them
+
+# ----- C/C++/extensions (rare but safe) -----
+*.so
+*.pyd
+*.dll
