@@ -11,7 +11,7 @@ import shutil
 from torch.optim import AdamW, SGD
 from torch.utils.data import DataLoader
 from itertools import cycle
-from datasets.rplang_edge_semantics_simplified import RPlanGEdgeSemanSimplified
+from .rplang_edge_semantics_simplified import RPlanGEdgeSemanSimplified
 from gsdiff.utils import *
 import torch.nn.functional as F
 from scripts.metrics.fid import fid

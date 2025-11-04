@@ -2,7 +2,7 @@ import os
 from torch.utils.data import Dataset
 import torch
 import numpy as np
-from datasets import tiny_graph
+from . import tiny_graph
 
 torch.set_printoptions(threshold=np.inf, linewidth=999999)
 np.set_printoptions(threshold=np.inf, linewidth=999999)
