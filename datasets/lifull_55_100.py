@@ -6,9 +6,6 @@ from torch.utils.data import Dataset
 import torch
 torch.set_printoptions(threshold=np.inf, linewidth=999999)
 np.set_printoptions(threshold=np.inf, linewidth=999999)
-
-
-
  
 class Lifull_55_100(Dataset):
     def __init__(self, mode):
