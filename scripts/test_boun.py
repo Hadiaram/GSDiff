@@ -38,7 +38,9 @@ resolution = 512
 
 '''create output_dir'''
 output_dir = 'test_outputs/AP-1/'
-os.makedirs(output_dir, exist_ok=False)
+if os.path.exists(output_dir):
+    shutil.rmtree(output_dir)
+os.makedirs(output_dir, exist_ok=True)
 
 '''Diffusion Settings'''
 # cosine beta
