@@ -3,10 +3,10 @@ import sys
 import cv2
 from PIL import Image, ImageDraw
 
-sys.path.append('/home/user00/HSZ/gsdiff-main') # Modify it yourself
-sys.path.append('/home/user00/HSZ/gsdiff-main/datasets') # Modify it yourself
-sys.path.append('/home/user00/HSZ/gsdiff-main/gsdiff') # Modify it yourself
-sys.path.append('/home/user00/HSZ/gsdiff-main/scripts/metrics') # Modify it yourself
+sys.path.append(r'C:\Users\hmbashir\AI Training\GSDiff') # Modify it yourself
+sys.path.append(r'C:\Users\hmbashir\AI Training\GSDiff\datasets') # Modify it yourself
+sys.path.append(r'C:\Users\hmbashir\AI Training\GSDiff\gsdiff') # Modify it yourself
+sys.path.append(r'C:\Users\hmbashir\AI Training\GSDiff\scripts\metrics') # Modify it yourself
 
 
 import math
