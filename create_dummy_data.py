@@ -26,12 +26,19 @@ for i in tqdm(range(num_samples)):
     
     num_real_corners = np.random.randint(10, 40)  # Random number of real corners
     
+    # Create global attention matrix (True for valid corners, False for padding)
+    global_matrix = np.zeros((53, 53), dtype=bool)
+    global_matrix[:num_real_corners, :num_real_corners] = True  # Only valid corners have attention
+    
+    # Create edges array - should have num_real_corners^2 elements when filtered by global_matrix
+    edges_full = np.random.randint(0, 2, (2809, 1)).astype(np.float32)
+    
     # Create graph for rplang-v3-withsemantics (used by RPlanGEdgeSemanSimplified)
     graph_withsemantics = {
         'corner_list_np_normalized_padding_withsemantics': np.random.randn(53, 16).astype(np.float32),
         'padding_mask': np.ones((53, 1), dtype=np.uint8),
-        'global_matrix_np_padding': np.random.randint(0, 2, (53, 53)).astype(bool),
-        'edges': np.random.randint(0, 2, (2809, 1)).astype(np.float32)
+        'global_matrix_np_padding': global_matrix,
+        'edges': edges_full
     }
     graph_withsemantics['padding_mask'][num_real_corners:] = 0
     
