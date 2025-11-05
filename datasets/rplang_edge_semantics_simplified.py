@@ -3,6 +3,7 @@ from torch.utils.data import Dataset
 import torch
 import numpy as np
 from . import tiny_graph
+from .path_utils import get_data_path
 
 torch.set_printoptions(threshold=np.inf, linewidth=999999)
 np.set_printoptions(threshold=np.inf, linewidth=999999)
@@ -27,11 +28,11 @@ class RPlanGEdgeSemanSimplified(Dataset):
         self.mode = mode
         '''train(65763) & val(3000) & test(3000)'''
         if self.mode == 'train':
-            self.files = os.listdir('../datasets/rplang-v3-withsemantics/train')
+            self.files = os.listdir(get_data_path('rplang-v3-withsemantics', 'train'))
         elif self.mode == 'val':
-            self.files = os.listdir('../datasets/rplang-v3-withsemantics/val')
+            self.files = os.listdir(get_data_path('rplang-v3-withsemantics', 'val'))
         elif self.mode == 'test':
-            self.files = os.listdir('../datasets/rplang-v3-withsemantics/test')
+            self.files = os.listdir(get_data_path('rplang-v3-withsemantics', 'test'))
         else:
             assert 0, 'mode error'
         self.files = sorted(self.files, key=lambda x: int(x[:-4]), reverse=False)
@@ -46,11 +47,11 @@ class RPlanGEdgeSemanSimplified(Dataset):
           return all unbatched things in ndarray in a dict'''
 
         if self.mode == 'train':
-            graph = np.load('../datasets/rplang-v3-withsemantics/train/' + self.files[index], allow_pickle=True).item()
+            graph = np.load(get_data_path('rplang-v3-withsemantics', 'train', self.files[index]), allow_pickle=True).item()
         elif self.mode == 'val':
-            graph = np.load('../datasets/rplang-v3-withsemantics/val/' + self.files[index], allow_pickle=True).item()
+            graph = np.load(get_data_path('rplang-v3-withsemantics', 'val', self.files[index]), allow_pickle=True).item()
         elif self.mode == 'test':
-            graph = np.load('../datasets/rplang-v3-withsemantics/test/' + self.files[index], allow_pickle=True).item()
+            graph = np.load(get_data_path('rplang-v3-withsemantics', 'test', self.files[index]), allow_pickle=True).item()
         else:
             assert 0, 'mode error'
 

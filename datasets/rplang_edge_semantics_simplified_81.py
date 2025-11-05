@@ -5,6 +5,7 @@ import numpy as np
 import random
 from PIL import Image, ImageDraw
 from tqdm import tqdm
+from .path_utils import get_data_path
 
 torch.set_printoptions(threshold=np.inf, linewidth=999999)
 np.set_printoptions(threshold=np.inf, linewidth=999999)
@@ -16,17 +17,17 @@ class RPlanGEdgeSemanSimplified_81(Dataset):
         self.mode = mode
         '''train(65763) & val(3000) & test(3000)'''
         if self.mode == 'train':
-            self.files = os.listdir('../datasets/rplang-v3-withsemantics-withboundary/train')
+            self.files = os.listdir(get_data_path('rplang-v3-withsemantics-withboundary', 'train'))
         elif self.mode == 'val':
-            self.files = os.listdir('../datasets/rplang-v3-withsemantics-withboundary/val')
+            self.files = os.listdir(get_data_path('rplang-v3-withsemantics-withboundary', 'val'))
         elif self.mode == 'test':
-            self.files = os.listdir('../datasets/rplang-v3-withsemantics-withboundary/test')
+            self.files = os.listdir(get_data_path('rplang-v3-withsemantics-withboundary', 'test'))
         else:
             assert 0, 'mode error'
         self.files = sorted(self.files, key=lambda x: int(x[:-4]), reverse=False)
         self.ftmps = []
         for fn in tqdm(self.files):
-            self.ftmps.append(np.load('../datasets/prerunning_cnn_featuremaps/' + fn, allow_pickle=True).item()[16][0])
+            self.ftmps.append(np.load(get_data_path('prerunning_cnn_featuremaps', fn), allow_pickle=True).item()[16][0])
 
 
     def __len__(self):
@@ -53,17 +54,12 @@ class RPlanGEdgeSemanSimplified_81(Dataset):
         # else:
         #     assert 0
 
-
-
-
-    
-
         if self.mode == 'train':
-            graph = np.load('../datasets/rplang-v3-withsemantics/train/' + self.files[index], allow_pickle=True).item()
+            graph = np.load(get_data_path('rplang-v3-withsemantics', 'train', self.files[index]), allow_pickle=True).item()
         elif self.mode == 'val':
-            graph = np.load('../datasets/rplang-v3-withsemantics/val/' + self.files[index], allow_pickle=True).item()
+            graph = np.load(get_data_path('rplang-v3-withsemantics', 'val', self.files[index]), allow_pickle=True).item()
         elif self.mode == 'test':
-            graph = np.load('../datasets/rplang-v3-withsemantics/test/' + self.files[index], allow_pickle=True).item()
+            graph = np.load(get_data_path('rplang-v3-withsemantics', 'test', self.files[index]), allow_pickle=True).item()
         else:
             assert 0, 'mode error'
 
