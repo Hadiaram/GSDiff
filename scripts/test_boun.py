@@ -158,7 +158,7 @@ if __name__ == '__main__':
 
 
     # Loading the trained edge model
-    model_path_EdgeModel = os.path.join('outputs', 'structure-56-36-interval1000', 'model_stage2_best_065000.pt')
+    model_path_EdgeModel = r"C:\Users\hmbashir\AI Training\GSDiff\scripts\outputs\structure-56-36-interval1000\model_stage2_best_065000.pt"
     model_EdgeModel = BoundEdgeModel().to(device)
     model_EdgeModel.load_state_dict(torch.load(model_path_EdgeModel, map_location=device))
     for param in model_EdgeModel.parameters():
@@ -166,7 +166,10 @@ if __name__ == '__main__':
 
     # DDPM
     test_metrics = []
-    model_path_CDDPMs = [os.path.join('outputs', 'structure-81-106-3', fn) for fn in os.listdir(os.path.join('outputs', 'structure-81-106-3')) if 'model' in fn and '.pt' in fn]
+    # NEW (manual path):
+    model_path_CDDPMs = [os.path.join(r'C:\Users\hmbashir\AI Training\GSDiff\scripts\outputs\structure-81-106-3', fn) 
+                        for fn in os.listdir(r'C:\Users\hmbashir\AI Training\GSDiff\scripts\outputs\structure-81-106-3') 
+                        if 'model' in fn and '.pt' in fn]
     for model_path_CDDPM in model_path_CDDPMs:
         # Extract model number from filename (e.g., 'model1000000.pt' -> '100')
         model_filename = os.path.basename(model_path_CDDPM)  # e.g., 'model1000000.pt'
