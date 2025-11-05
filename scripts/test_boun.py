@@ -72,7 +72,7 @@ posterior_mean_coef2 = (1.0 - alphas_cumprod_prev) * np.sqrt(alphas) / (
 
 '''Data'''
 dataset_test = RPlanGEdgeSemanSimplified_81('test')
-dataloader_test = DataLoader(dataset_test, batch_size=batch_size_test, shuffle=False, num_workers=64,
+dataloader_test = DataLoader(dataset_test, batch_size=batch_size_test, shuffle=False, num_workers=0,
                         drop_last=False, pin_memory=False)  # try different num_workers to be faster
 dataloader_test_iter = iter(cycle(dataloader_test))
 
