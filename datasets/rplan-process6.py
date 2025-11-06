@@ -28,28 +28,28 @@ val_fnids = [int(fnid[:-4]) for fnid in val_tiny_graph]
 
 
 def deep_compare(a, b):
-    '''判断两个字典数据是否完全相同'''
-    # 如果类型不同，直接返回 False
+    '''Determine whether two Python data structures (dict/list/tuple/ndarray/scalar) are completely identical.'''
+    # If the types differ, return False immediately
     if type(a) != type(b):
         return False
 
-    # 如果是字典，比较它们的 key 与对应的值
+    # If a dict, compare keys then recursively compare corresponding values
     if isinstance(a, dict):
         if a.keys() != b.keys():
             return False
         return all(deep_compare(a[key], b[key]) for key in a)
 
-    # 如果是列表或元组，则逐项比较
+    # If a list or tuple, compare element by element
     elif isinstance(a, (list, tuple)):
         if len(a) != len(b):
             return False
         return all(deep_compare(item1, item2) for item1, item2 in zip(a, b))
 
-    # 如果是 numpy 数组，则使用 np.array_equal 比较
+    # If a numpy array, use np.array_equal for exact match
     elif isinstance(a, np.ndarray):
         return np.array_equal(a, b)
 
-    # 其他类型直接比较（例如 int, float, str 等）
+    # Other types: direct comparison (int, float, str, etc.)
     else:
         return a == b
 
@@ -59,7 +59,7 @@ def check_subdir_file_counts(base_dir):
         full_path = os.path.join(base_dir, subdir)
         file_list = [f for f in os.listdir(full_path)
                      if os.path.isfile(os.path.join(full_path, f))]
-        print('文件数' + str(len(file_list)))
+    print('File count: ' + str(len(file_list)))
 
 
 bubblecategory = {}
@@ -75,8 +75,8 @@ edgecategory[1] = 0
 
 boundary_num = [] # max: 38 (76 dim)
 
-'''前置数据：rplang-v3-withsemantics'''
-'''输出数据：rplang-v3-withsemantics-withboundary和rplang-v3-withsemantics-withboundary-v2'''
+'''Input data: rplang-v3-withsemantics'''
+'''Output data: rplang-v3-withsemantics-withboundary and rplang-v3-withsemantics-withboundary-v2'''
 
 if not os.path.exists('./rplandata/Data/rplang-v3-withsemantics-withboundary'):
     os.mkdir('./rplandata/Data/rplang-v3-withsemantics-withboundary')
@@ -112,21 +112,21 @@ for val_file in tqdm(val_files):
         '''
     '''coords_withsemantics, (53, 16)'''
     corners_withsemantics = val_graph['corner_list_np_normalized_padding_withsemantics']
-    # 初始化一个n*9的新数组(53, 9)
+    # Initialize a new n*9 array (53, 9)
     corners_withsemantics_simplified = np.zeros((corners_withsemantics.shape[0], 9))
-    # 复制第0、1列 坐标
+    # Copy columns 0 and 1 (coordinates)
     corners_withsemantics_simplified[:, 0:2] = corners_withsemantics[:, 0:2]
-    # 计算新的第2列 标签0 客厅/餐厅/玄关
+    # Compute new column 2 (label 0: living room / dining room / entrance)
     corners_withsemantics_simplified[:, 2] = (corners_withsemantics[:, [2, 6, 12]]).sum(axis=1)
-    # 计算新的第3列 标签1 卧室/书房
+    # Compute new column 3 (label 1: bedroom / study)
     corners_withsemantics_simplified[:, 3] = (corners_withsemantics[:, [3, 7, 8, 9, 10]]).sum(axis=1)
-    # 计算新的第4列 标签2 橱柜
+    # Compute new column 4 (label 2: cabinet)
     corners_withsemantics_simplified[:, 4] = (corners_withsemantics[:, [13, 14]]).sum(axis=1)
-    # 其他
-    corners_withsemantics_simplified[:, 5] = corners_withsemantics[:, 4] # 标签3 厨房
-    corners_withsemantics_simplified[:, 6] = corners_withsemantics[:, 5] # 标签4 卫生间
-    corners_withsemantics_simplified[:, 7] = corners_withsemantics[:, 11] # 标签5 阳台
-    corners_withsemantics_simplified[:, 8] = corners_withsemantics[:, 15] # 标签6 外部
+    # Others
+    corners_withsemantics_simplified[:, 5] = corners_withsemantics[:, 4] # label 3: kitchen
+    corners_withsemantics_simplified[:, 6] = corners_withsemantics[:, 5] # label 4: bathroom
+    corners_withsemantics_simplified[:, 7] = corners_withsemantics[:, 11] # label 5: balcony
+    corners_withsemantics_simplified[:, 8] = corners_withsemantics[:, 15] # label 6: exterior
 
     '''attn 1 matrix, (53, 53)'''
     global_attn_matrix = val_graph['global_matrix_np_padding'].astype(bool)
@@ -151,7 +151,7 @@ for val_file in tqdm(val_files):
     edges_val_depadded = np.concatenate((1 - edges_val_depadded, edges_val_depadded), axis=2)
 
     ''' get planar cycles'''
-    # 形状为 (1, n, 14) 的 ndarray，包含 0 和 1;找到每个子数组中 1 所在的索引,用 99999 替换值为 0 的原始元素
+    # Shape (1,n,14) ndarray with 0/1; find indices of 1s in each subarray and replace 0-valued positions with 99999
     semantics_gt_i_transform_val = semantics_0_val_depadded
     semantics_gt_i_transform_indices_val = np.indices(semantics_gt_i_transform_val.shape)[-1]
     semantics_gt_i_transform_val = np.where(semantics_gt_i_transform_val == 1,
@@ -183,7 +183,7 @@ for val_file in tqdm(val_files):
     #     print(p)
 
 
-    # 定义一个函数来计算两个向量之间的角度
+    # Define a function to compute the angle between two vectors
     def angle(v1, v2):
         dot_product = np.dot(v1, v2)
         norm_product = np.linalg.norm(v1) * np.linalg.norm(v2)
@@ -194,16 +194,16 @@ for val_file in tqdm(val_files):
     count = 0
     for polygon_i, polygon in enumerate(polygons):
         if simple_cycles_semantics_val[polygon_i] == 6:
-            # 多边形的顶点
+            # Polygon vertices
             polygon.pop(-1)
-            # 遍历多边形的每个角
+            # Iterate each corner of the polygon
             for i in range(len(polygon)):
                 p1, p2, p3 = np.array(polygon[i % len(polygon)]), np.array(polygon[(i + 1) % len(polygon)]), np.array(polygon[(i + 2) % len(polygon)])
                 # print(p1, p2, p3)
                 v1, v2 = p1 - p2, p3 - p2
                 ang = angle(v1, v2)
                 # print(ang)
-                # 如果角度接近180度（误差在10度之内），打印这个点
+                # If angle is within 10 degrees of 180 treat as flat (ignore); else record as non-flat
                 if np.abs(ang - 180) < 10:
                     # print("Flat angle at point:", p2)
                     pass
@@ -217,7 +217,7 @@ for val_file in tqdm(val_files):
             pass
     assert count == 1, 'count ==' + str(count) + '    ' + val_file
 
-    # 断言类型为6的只有一个
+    # Assert there is only one type-6 polygon
     assert simple_cycles_semantics_val.count(6) == 1, val_file
 
 
@@ -240,7 +240,7 @@ for val_file in tqdm(val_files):
     val_graph['boundary_vertex_indices'] = boundary_vertex_indices_mask
     # print(val_graph['boundary_vertex_indices'])
 
-    # 边界邻接矩阵
+    # Boundary adjacency matrix
     boundary_adjacency_matrix = np.zeros_like(val_graph['adjacency_matrix_np_padding'])
     for i, coord in enumerate(list2):
         list1_i = list1.index(coord)
@@ -253,7 +253,7 @@ for val_file in tqdm(val_files):
     # assert 0
 
 
-    # 边界坐标序列
+    # Boundary coordinate sequence
     val_graph['boundary_vertex_coords_4cvae'] = list2
     val_graph['boundary_adjacency_matrix'] = boundary_adjacency_matrix
 
@@ -271,7 +271,7 @@ for val_file in tqdm(val_files):
 
 
 
-# 检查子目录文件的数量
+# Check subdirectory file counts
 check_subdir_file_counts('./rplandata/Data/rplang-v3-withsemantics')
 check_subdir_file_counts('./rplandata/Data/rplang-v3-withsemantics-withboundary')
 check_subdir_file_counts('./rplandata/Data/rplang-v3-withsemantics-withboundary-v2')

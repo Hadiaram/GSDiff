@@ -5,7 +5,7 @@ from itertools import cycle
 from torch.utils.data import Dataset, DataLoader
 from tqdm import *
 import networkx as nx
-from gsdiff_topo.utils import *
+from gsdiff.utils import *
 
 
 # 3.9 2.59

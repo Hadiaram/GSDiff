@@ -7,8 +7,8 @@ from . import tiny_graph
 torch.set_printoptions(threshold=np.inf, linewidth=999999)
 np.set_printoptions(threshold=np.inf, linewidth=999999)
 
-''' 房间类型是7类，实际不包含外部所以只有6类
- 房间数最大是8最小是4'''
+'''Room types are defined in 7 categories, but excluding the external area there are only 6 actually used.
+The number of rooms ranges from 4 to 8.'''
 class RPlanGBubbleDiagram(Dataset):
     def __init__(self, mode):
         super().__init__()
@@ -42,8 +42,10 @@ class RPlanGBubbleDiagram(Dataset):
             assert 0, 'mode error'
 
         semantics = np.eye(7)[bbdiagram['semantics'] + [0] * (8 - len(bbdiagram['semantics']))].astype(np.float32)
-        # 设计一套规则让每个节点都有一定概率转变为其他类型，边同理。
-        # 我们统计了数据集中每一类节点的类型比例和边的0、1比例，把每一个节点（行向量）乘以以数据集节点分布复制行向量定义的转移矩阵，使得它的下一步满足数据集统计分布。
+        # Design a rule system so each node has a probability of changing to another type; edges follow the same idea.
+        # We counted the proportion of every node type and the 0/1 edge ratio in the dataset. Each node (row vector)
+        # is multiplied by a transition matrix constructed from the dataset distribution so its next state matches
+        # the empirical statistics.
         # {0: 0.1512, 1: 0.3833, 2: 0.0071, 3: 0.1403, 4: 0.1603, 5: 0.1578, 6: 0}
         # {0: 0.6489, 1: 0.3511}
         if self.randomize_data:
@@ -76,7 +78,6 @@ class RPlanGBubbleDiagram(Dataset):
         adjacency_matrix = np.zeros((8, 8), dtype=np.uint8)
         adjacency_matrix[:len(bbdiagram['semantics']), :len(bbdiagram['semantics'])] = adjacency_matrix_ori
 
-
         semantics_padding_mask = np.zeros((8, 1), dtype=np.uint8)
         semantics_padding_mask[:len(bbdiagram['semantics']), :] = 1
 
@@ -85,7 +86,5 @@ class RPlanGBubbleDiagram(Dataset):
 
         global_matrix = np.zeros((8, 8), dtype=np.uint8)
         global_matrix[:len(bbdiagram['semantics']), :len(bbdiagram['semantics'])] = 1
-
-
 
         return semantics, adjacency_matrix, semantics_padding_mask, global_matrix, room_number

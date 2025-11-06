@@ -56,17 +56,17 @@ class RPlanGEdgeSemanSimplified_55_100(Dataset):
 
         '''coords_withsemantics, (53, 16)'''
         corners_withsemantics = graph['corner_list_np_normalized_padding_withsemantics']
-        # 初始化一个n*9的新数组(53, 9)
+        # Initialize a new n*9 array (53, 9)
         corners_withsemantics_simplified = np.zeros((corners_withsemantics.shape[0], 9))
-        # 复制第0、1列
+        # Copy columns 0 and 1
         corners_withsemantics_simplified[:, 0:2] = corners_withsemantics[:, 0:2]
-        # 计算新的第2列
+        # Compute new column 2 by summing original columns 2, 6, 12
         corners_withsemantics_simplified[:, 2] = (corners_withsemantics[:, [2, 6, 12]]).sum(axis=1)
-        # 计算新的第3列
+        # Compute new column 3 by summing original columns 3, 7, 8, 9, 10
         corners_withsemantics_simplified[:, 3] = (corners_withsemantics[:, [3, 7, 8, 9, 10]]).sum(axis=1)
-        # 计算新的第4列
+        # Compute new column 4 by summing original columns 13, 14
         corners_withsemantics_simplified[:, 4] = (corners_withsemantics[:, [13, 14]]).sum(axis=1)
-        # 复制第4、5、11、15列
+        # Copy original columns 4, 5, 11, 15 into simplified columns 5, 6, 7, 8
         corners_withsemantics_simplified[:, 5] = corners_withsemantics[:, 4]
         corners_withsemantics_simplified[:, 6] = corners_withsemantics[:, 5]
         corners_withsemantics_simplified[:, 7] = corners_withsemantics[:, 11]
@@ -80,10 +80,10 @@ class RPlanGEdgeSemanSimplified_55_100(Dataset):
         global_attn_matrix = np.ones((53, 53), dtype=np.uint8)
         '''corners padding mask, (53, 1)'''
         corners_padding_mask = graph['padding_mask'] # uint8
-        '''随机排列'''
-        # 生成一个随机排列的索引数组
+        '''Random permutation'''
+        # Generate a random permutation index array to shuffle corners and padding mask consistently
         permutation_indices = np.random.permutation(53)
-        # 使用相同的排列索引来重排两个数组
+    # Apply the same permutation indices to reorder both arrays
         corners_withsemantics_simplified = corners_withsemantics_simplified[permutation_indices]
         corners_padding_mask = corners_padding_mask[permutation_indices]
 

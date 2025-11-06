@@ -7,13 +7,13 @@ from . import tiny_graph
 torch.set_printoptions(threshold=np.inf, linewidth=999999)
 np.set_printoptions(threshold=np.inf, linewidth=999999)
 
-''' 房间类型是7类，实际不包含外部所以只有6类
- 房间数最大是8最小是4'''
+'''Room types are defined in 7 categories, but excluding the exterior area only 6 are actually used.
+Room count ranges from 4 to 8.'''
 class RPlanGEdgeSemanSimplified_80(Dataset):
     def __init__(self, mode):
         super().__init__()
         self.mode = mode
-        # self.randomize_data一定为False（因为不是编码器预训练）
+        # self.randomize_data must be False (this is not encoder pretraining)
         '''train(65763) & val(3000) & test(3000)'''
         if self.mode == 'train':
             self.files = os.listdir('../datasets/rplang-v3-bubble-diagram/train')
@@ -23,7 +23,7 @@ class RPlanGEdgeSemanSimplified_80(Dataset):
             self.files = os.listdir('../datasets/rplang-v3-bubble-diagram/test')
         else:
             assert 0, 'mode error'
-        self.files = sorted(self.files, key=lambda x: int(x[:-4]), reverse=False) # 这是一个0-80788的整数
+        self.files = sorted(self.files, key=lambda x: int(x[:-4]), reverse=False)  # This is an integer file id in the range 0–80788
 
     def __len__(self):
         '''return len(dataset)'''
@@ -41,8 +41,10 @@ class RPlanGEdgeSemanSimplified_80(Dataset):
 
 
         semantics = np.eye(7)[bbdiagram['semantics'] + [0] * (8 - len(bbdiagram['semantics']))].astype(np.float64)
-        # 设计一套规则让每个节点都有一定概率转变为其他类型，边同理。
-        # 我们统计了数据集中每一类节点的类型比例和边的0、1比例，把每一个节点（行向量）乘以以数据集节点分布复制行向量定义的转移矩阵，使得它的下一步满足数据集统计分布。
+        # Design a rule system so each node has a probability of changing to another type; edges follow the same idea.
+        # We counted the proportion of every node type and the 0/1 edge ratio in the dataset. Each node (row vector)
+        # is multiplied by a transition matrix constructed from the dataset distribution so its next state matches
+        # the empirical statistics.
         # {0: 0.1512, 1: 0.3833, 2: 0.0071, 3: 0.1403, 4: 0.1603, 5: 0.1578, 6: 0}
         # {0: 0.6489, 1: 0.3511}
         semantics[len(bbdiagram['semantics']):] = 0
@@ -85,17 +87,17 @@ class RPlanGEdgeSemanSimplified_80(Dataset):
 
         '''coords_withsemantics, (53, 16)'''
         corners_withsemantics = graph['corner_list_np_normalized_padding_withsemantics']
-        # 初始化一个n*9的新数组(53, 9)
+        # Initialize a new n*9 array (53, 9)
         corners_withsemantics_simplified = np.zeros((corners_withsemantics.shape[0], 9))
-        # 复制第0、1列
+        # Copy columns 0 and 1
         corners_withsemantics_simplified[:, 0:2] = corners_withsemantics[:, 0:2]
-        # 计算新的第2列
+        # Compute new column 2 by summing original columns 2, 6, 12
         corners_withsemantics_simplified[:, 2] = (corners_withsemantics[:, [2, 6, 12]]).sum(axis=1)
-        # 计算新的第3列
+        # Compute new column 3 by summing original columns 3, 7, 8, 9, 10
         corners_withsemantics_simplified[:, 3] = (corners_withsemantics[:, [3, 7, 8, 9, 10]]).sum(axis=1)
-        # 计算新的第4列
+        # Compute new column 4 by summing original columns 13, 14
         corners_withsemantics_simplified[:, 4] = (corners_withsemantics[:, [13, 14]]).sum(axis=1)
-        # 复制第4、5、11、15列
+        # Copy original columns 4, 5, 11, 15 into simplified columns 5, 6, 7, 8
         corners_withsemantics_simplified[:, 5] = corners_withsemantics[:, 4]
         corners_withsemantics_simplified[:, 6] = corners_withsemantics[:, 5]
         corners_withsemantics_simplified[:, 7] = corners_withsemantics[:, 11]

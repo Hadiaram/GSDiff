@@ -2,7 +2,6 @@ import math
 from itertools import cycle
 
 import networkx as nx
-import ot
 import numpy as np
 from scipy.spatial import cKDTree
 import time
@@ -19,7 +18,7 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import *
 import cv2
-from house_diffusion.utils import *
+from gsdiff.utils import *
 
 
 batch_size = 1

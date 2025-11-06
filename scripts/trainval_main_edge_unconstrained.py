@@ -9,7 +9,7 @@ import torch
 from torch.optim import AdamW, SGD
 from torch.utils.data import DataLoader
 from datasets.rplang_edge_semantics_simplified import RPlanGEdgeSemanSimplified
-from gsdiff.heterhouse_56_13 import *
+from gsdiff.heterhouse_56_13_lifull import *
 from gsdiff.utils import *
 from itertools import cycle
 

@@ -10,7 +10,7 @@ np.set_printoptions(threshold=np.inf, linewidth=999999)
 
 
 class RPlanGEdgeSemanSimplified_56_32(Dataset):
-    def __init__(self, mode): # 不随机数据
+    def __init__(self, mode):  # deterministic data (no random augmentation)
         super().__init__()
         self.mode = mode
         '''train(65763) & val(3000) & test(3000)'''
@@ -82,17 +82,17 @@ class RPlanGEdgeSemanSimplified_56_32(Dataset):
 
         '''coords_withsemantics, (53, 16)'''
         corners_withsemantics = graph['corner_list_np_normalized_padding_withsemantics']
-        # 初始化一个n*9的新数组(53, 9)
+    # Initialize a new n*9 array (53, 9)
         corners_withsemantics_simplified = np.zeros((corners_withsemantics.shape[0], 9))
-        # 复制第0、1列
+    # Copy columns 0 and 1 (x, y coordinates)
         corners_withsemantics_simplified[:, 0:2] = corners_withsemantics[:, 0:2]
-        # 计算新的第2列
+    # Compute new column 2: sum of original semantic columns 2, 6, 12
         corners_withsemantics_simplified[:, 2] = (corners_withsemantics[:, [2, 6, 12]]).sum(axis=1)
-        # 计算新的第3列
+    # Compute new column 3: sum of original semantic columns 3, 7, 8, 9, 10
         corners_withsemantics_simplified[:, 3] = (corners_withsemantics[:, [3, 7, 8, 9, 10]]).sum(axis=1)
-        # 计算新的第4列
+    # Compute new column 4: sum of original semantic columns 13 and 14
         corners_withsemantics_simplified[:, 4] = (corners_withsemantics[:, [13, 14]]).sum(axis=1)
-        # 复制第4、5、11、15列
+    # Copy original columns 4, 5, 11, 15 into simplified columns 5, 6, 7, 8
         corners_withsemantics_simplified[:, 5] = corners_withsemantics[:, 4]
         corners_withsemantics_simplified[:, 6] = corners_withsemantics[:, 5]
         corners_withsemantics_simplified[:, 7] = corners_withsemantics[:, 11]

@@ -21,28 +21,28 @@ import os
 
 
 def deep_compare(a, b):
-    '''判断两个字典数据是否完全相同'''
-    # 如果类型不同，直接返回 False
+    '''Determine whether two Python data structures (dict/list/tuple/ndarray/scalar) are completely identical.'''
+    # If the types differ, return False immediately
     if type(a) != type(b):
         return False
 
-    # 如果是字典，比较它们的 key 与对应的值
+    # If a dict, compare keys then recursively compare corresponding values
     if isinstance(a, dict):
         if a.keys() != b.keys():
             return False
         return all(deep_compare(a[key], b[key]) for key in a)
 
-    # 如果是列表或元组，则逐项比较
+    # If a list or tuple, compare element by element
     elif isinstance(a, (list, tuple)):
         if len(a) != len(b):
             return False
         return all(deep_compare(item1, item2) for item1, item2 in zip(a, b))
 
-    # 如果是 numpy 数组，则使用 np.array_equal 比较
+    # If a numpy array, use np.array_equal for exact match
     elif isinstance(a, np.ndarray):
         return np.array_equal(a, b)
 
-    # 其他类型直接比较（例如 int, float, str 等）
+    # Other types: direct comparison (int, float, str, etc.)
     else:
         return a == b
 
@@ -52,7 +52,7 @@ def check_subdir_file_counts(base_dir):
         full_path = os.path.join(base_dir, subdir)
         file_list = [f for f in os.listdir(full_path)
                      if os.path.isfile(os.path.join(full_path, f))]
-        print('文件数' + str(len(file_list)))
+    print('File count: ' + str(len(file_list)))
 
 
 if not os.path.exists('rplandata/Data/rplang-v3-bubble-diagram'):
@@ -94,17 +94,17 @@ for train_file in tqdm(train_files):
         '''
     '''coords_withsemantics, (53, 16)'''
     corners_withsemantics = train_graph['corner_list_np_normalized_padding_withsemantics']
-    # 初始化一个n*9的新数组(53, 9)
+    # Initialize a new n*9 array (53, 9)
     corners_withsemantics_simplified = np.zeros((corners_withsemantics.shape[0], 9))
-    # 复制第0、1列
+    # Copy columns 0 and 1 (coordinates)
     corners_withsemantics_simplified[:, 0:2] = corners_withsemantics[:, 0:2]
-    # 计算新的第2列
+    # Compute new column 2 (label 0: living room / dining room / entrance)
     corners_withsemantics_simplified[:, 2] = (corners_withsemantics[:, [2, 6, 12]]).sum(axis=1)
-    # 计算新的第3列
+    # Compute new column 3 (label 1: bedroom / study)
     corners_withsemantics_simplified[:, 3] = (corners_withsemantics[:, [3, 7, 8, 9, 10]]).sum(axis=1)
-    # 计算新的第4列
+    # Compute new column 4 (label 2: cabinet)
     corners_withsemantics_simplified[:, 4] = (corners_withsemantics[:, [13, 14]]).sum(axis=1)
-    # 复制第4、5、11、15列
+    # Copy original columns 4,5,11,15 into new columns 5,6,7,8 (labels 3 kitchen, 4 bathroom, 5 balcony, 6 exterior)
     corners_withsemantics_simplified[:, 5] = corners_withsemantics[:, 4]
     corners_withsemantics_simplified[:, 6] = corners_withsemantics[:, 5]
     corners_withsemantics_simplified[:, 7] = corners_withsemantics[:, 11]
@@ -133,7 +133,7 @@ for train_file in tqdm(train_files):
     edges_train_depadded = np.concatenate((1 - edges_train_depadded, edges_train_depadded), axis=2)
 
     ''' get planar cycles'''
-    # 形状为 (1, n, 14) 的 ndarray，包含 0 和 1;找到每个子数组中 1 所在的索引,用 99999 替换值为 0 的原始元素
+    # Shape (1,n,14) ndarray with 0/1; find indices of 1s in each subarray and replace 0-valued positions with 99999
     semantics_gt_i_transform_train = semantics_0_train_depadded
     semantics_gt_i_transform_indices_train = np.indices(semantics_gt_i_transform_train.shape)[-1]
     semantics_gt_i_transform_train = np.where(semantics_gt_i_transform_train == 1,
@@ -150,10 +150,12 @@ for train_file in tqdm(train_files):
     # print(gt_i_points_train)
     # print(gt_i_edges_train)
 
-    '''我们当初做实验的时候，气泡图gt的语义的提取具有随机性，但是根据RPLAN数据集的条款，我们没有权利以任何方式公开RPLAN数据集的内容。
-    我们能提供的只有这个提取气泡图数据的脚本。
-    所以你们用相同的脚本提取的气泡图gt的语义与我们自己做实验的时候会有部分不同，但是因为数据集规模较大，最终的性能指标在统计意义上应该不会有太大差异。
-    你们也可以使用get_cycle_basis_and_semantic_3_semansimplified来提取房间语义并自己训练拓扑图相关的模型，get_cycle_basis_and_semantic_3_semansimplified这个方法不是随机的，相比论文中的指标可能会有提升。'''
+    '''Note on semantic extraction randomness:
+    During our original experiments, ground-truth bubble (room) semantics were derived with a procedure containing inherent randomness.
+    Under the RPLAN dataset terms we cannot release any portion of the dataset itself—only this extraction script.
+    Running this same script yourself may yield slightly different bubble semantics compared to those we observed, but given the dataset scale
+    the final aggregate metrics should not differ significantly. Alternatively, you can adopt get_cycle_basis_and_semantic_3_semansimplified
+    which assigns room semantics deterministically and may offer marginal metric improvements relative to the paper's reported numbers.'''
     d_rev_train, simple_cycles_train, simple_cycles_semantics_train = get_cycle_basis_and_semantic_2_semansimplified(
         gt_i_points_train,
         gt_i_edges_train)
@@ -185,8 +187,9 @@ for train_file in tqdm(train_files):
     edgecategory[0] += ((len(adjacency_matrix) * (len(adjacency_matrix) + 1)) / 2) - np.sum(np.triu(np.array(adjacency_matrix)))
 
 
-    # 使用Shoelace公式来计算面积，然后使用重心的公式来计算凹多边形的重心。在考虑邻接性并绘制时，我们可以使用OpenCV图形库。以下是相关的Python代码：
-    # 计算多边形的重心
+    # Use the Shoelace formula to compute area, then the centroid formula to compute the centroid of a concave polygon.
+    # When considering adjacency and drawing we can use the OpenCV library. The related Python code:
+    # Compute the centroid of the polygon
     def get_polygon_centroid(polygon):
         area = 0
         x = 0
@@ -204,11 +207,11 @@ for train_file in tqdm(train_files):
 
 
 
-    # 计算每个多边形的重心
+    # Compute the centroid for each polygon
     centroids = [get_polygon_centroid(polygon[:-1]) for polygon in polygons]
 
 
-    # 保存气泡图的房间多边形（首尾相同）、重心、类型、邻接矩阵。
+    # Save the bubble diagram room polygons (first and last point identical), centroids, types, and adjacency matrix.
     bbdiagram = {}
     bbdiagram['file_id'] = train_graph['file_id']
     bbdiagram['polygons'] = simple_cycles_train

@@ -36,54 +36,54 @@ class RPlanGEdgeSemanSimplified_78_10_prerunCNN(Dataset):
             if not self.random_training_data:
                 graph = np.load('../datasets/rplang-v3-withsemantics-withboundary/train/' + self.files[index],
                                 allow_pickle=True).item()
-                fileid = graph['file_id'] # 整数
+                fileid = graph['file_id']  # integer id
                 '''coord, (53, 2)'''
                 corners = graph['corner_list_np_normalized_padding_withsemantics'][:, 0:2]
 
                 '''corners padding mask, (53, 1)'''
                 corners_padding_mask = graph['padding_mask']  # uint8
                 '''boundary vertex indices, (53, 2)'''
-                boundary_vertex_indices = graph['boundary_vertex_indices']  # [1 1]表示是边界角点 [0 0]表示非边界角点或是padding
+                boundary_vertex_indices = graph['boundary_vertex_indices']  # [1 1] means boundary corner; [0 0] means non-boundary or padding
                 boundary_infos = np.load('../datasets/rplang-v3-withsemantics-withboundary-v2/train/' + self.files[index],
                                          allow_pickle=True).item()
-                boundary_adjacency_matrix = boundary_infos['boundary_adjacency_matrix'].astype(bool)  # 边界邻接矩阵
+                boundary_adjacency_matrix = boundary_infos['boundary_adjacency_matrix'].astype(bool)  # Boundary adjacency matrix (bool)
             
                 
         elif self.mode == 'val':
             graph = np.load('../datasets/rplang-v3-withsemantics-withboundary/val/' + self.files[index],
                             allow_pickle=True).item()
-            fileid = graph['file_id'] # 整数
+            fileid = graph['file_id']  # integer id
             corners = graph['corner_list_np_normalized_padding_withsemantics'][:, 0:2]
             '''corners padding mask, (53, 1)'''
             corners_padding_mask = graph['padding_mask']  # uint8
             '''boundary vertex indices, (53, 2)'''
-            boundary_vertex_indices = graph['boundary_vertex_indices']  # [1 1]表示是边界角点 [0 0]表示非边界角点或是padding
+            boundary_vertex_indices = graph['boundary_vertex_indices']  # [1 1] means boundary corner; [0 0] means non-boundary or padding
             boundary_infos = np.load('../datasets/rplang-v3-withsemantics-withboundary-v2/val/' + self.files[index],
                                      allow_pickle=True).item()
-            boundary_adjacency_matrix = boundary_infos['boundary_adjacency_matrix'].astype(bool)  # 边界邻接矩阵
+            boundary_adjacency_matrix = boundary_infos['boundary_adjacency_matrix'].astype(bool)  # Boundary adjacency matrix (bool)
 
         elif self.mode == 'test':
             graph = np.load('../datasets/rplang-v3-withsemantics-withboundary/test/' + self.files[index],
                             allow_pickle=True).item()
-            fileid = graph['file_id'] # 整数
+            fileid = graph['file_id']  # integer id
             corners = graph['corner_list_np_normalized_padding_withsemantics'][:, 0:2]
             '''corners padding mask, (53, 1)'''
             corners_padding_mask = graph['padding_mask']  # uint8
             '''boundary vertex indices, (53, 2)'''
-            boundary_vertex_indices = graph['boundary_vertex_indices']  # [1 1]表示是边界角点 [0 0]表示非边界角点或是padding
+            boundary_vertex_indices = graph['boundary_vertex_indices']  # [1 1] means boundary corner; [0 0] means non-boundary or padding
             boundary_infos = np.load('../datasets/rplang-v3-withsemantics-withboundary-v2/test/' + self.files[index],
                                      allow_pickle=True).item()
-            boundary_adjacency_matrix = boundary_infos['boundary_adjacency_matrix'].astype(bool)  # 边界邻接矩阵
+            boundary_adjacency_matrix = boundary_infos['boundary_adjacency_matrix'].astype(bool)  # Boundary adjacency matrix (bool)
         else:
             assert 0
-        # 画出用于CNN的图像并将0-255的值归一化到[-1, 1]，和坐标相同的归一化
+        # Draw image for CNN; coordinates already normalized so later we normalize pixel values to [-1, 1]
         corners_unnorm = ((corners * boundary_vertex_indices) * 128 + 128).astype(np.int32)
-        polygon_edges = np.triu(boundary_adjacency_matrix, 1)  # 取上三角矩阵
-        # 创建一个256x256的白色图像
+        polygon_edges = np.triu(boundary_adjacency_matrix, 1)  # Take upper-triangular part (each undirected edge once)
+        # Create a 256x256 white image canvas
         image = Image.new("RGB", (256, 256), "white")
         draw = ImageDraw.Draw(image)
         
-        # 定义线条颜色和宽度
+        # Define line colors and widths (multi-scale boundary rendering)
         lines_info = [
             {'width': 7, 'color': "black"},
             {'width': 5, 'color': "black"},
@@ -91,7 +91,7 @@ class RPlanGEdgeSemanSimplified_78_10_prerunCNN(Dataset):
             {'width': 1, 'color': "black"}
         ]
         
-        # 绘制线条
+        # Render polygon edges in multiple passes
         for line in lines_info:
             for i in range(len(corners_unnorm)):
                 for j in range(i + 1, len(corners_unnorm)):
@@ -106,7 +106,7 @@ class RPlanGEdgeSemanSimplified_78_10_prerunCNN(Dataset):
 
                 
         
-        # 将图像像素值归一化: (像素值 - 128) / 128
+        # Normalize image pixel values: (pixel - 128) / 128 -> range roughly [-1, 1]
         normalized_image_array = (np.array(image).astype(np.int32) - 128) / 128
         normalized_image_array = normalized_image_array.transpose((2, 0, 1))
         return normalized_image_array, fileid

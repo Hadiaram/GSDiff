@@ -52,10 +52,13 @@ class RPlanGEdgeSemanSimplified_56_31(Dataset):
 
 
         semantics = np.eye(7)[bbdiagram['semantics'] + [0] * (8 - len(bbdiagram['semantics']))].astype(np.float64)
-        # 设计一套规则让每个节点都有一定概率转变为其他类型，边同理。
-        # 我们统计了数据集中每一类节点的类型比例和边的0、1比例，把每一个节点（行向量）乘以以数据集节点分布复制行向量定义的转移矩阵，使得它的下一步满足数据集统计分布。
-        # {0: 0.1512, 1: 0.3833, 2: 0.0071, 3: 0.1403, 4: 0.1603, 5: 0.1578, 6: 0}
-        # {0: 0.6489, 1: 0.3511}
+    # Concept (data augmentation idea, currently inactive here): define a rule-based transition so each node type
+    # can stochastically change to another type; similarly for edges.
+    # We counted dataset-wide proportions of each node semantic class and edge 0/1 ratio; multiplying each one-hot
+    # row vector by a transition matrix derived from those empirical distributions would produce next-step semantics
+    # matching dataset statistics.
+    # Node class empirical distribution: {0: 0.1512, 1: 0.3833, 2: 0.0071, 3: 0.1403, 4: 0.1603, 5: 0.1578, 6: 0}
+    # Edge binary empirical distribution: {0: 0.6489, 1: 0.3511}
         semantics[len(bbdiagram['semantics']):] = 0
 
 
@@ -100,17 +103,17 @@ class RPlanGEdgeSemanSimplified_56_31(Dataset):
 
         '''coords_withsemantics, (53, 16)'''
         corners_withsemantics = graph['corner_list_np_normalized_padding_withsemantics']
-        # 初始化一个n*9的新数组(53, 9)
+    # Initialize a new n*9 array (53, 9)
         corners_withsemantics_simplified = np.zeros((corners_withsemantics.shape[0], 9))
-        # 复制第0、1列
+    # Copy columns 0 and 1 (x, y coordinates)
         corners_withsemantics_simplified[:, 0:2] = corners_withsemantics[:, 0:2]
-        # 计算新的第2列
+    # Compute new column 2: sum of original semantic columns 2, 6, 12
         corners_withsemantics_simplified[:, 2] = (corners_withsemantics[:, [2, 6, 12]]).sum(axis=1)
-        # 计算新的第3列
+    # Compute new column 3: sum of original semantic columns 3, 7, 8, 9, 10
         corners_withsemantics_simplified[:, 3] = (corners_withsemantics[:, [3, 7, 8, 9, 10]]).sum(axis=1)
-        # 计算新的第4列
+    # Compute new column 4: sum of original semantic columns 13 and 14
         corners_withsemantics_simplified[:, 4] = (corners_withsemantics[:, [13, 14]]).sum(axis=1)
-        # 复制第4、5、11、15列
+    # Copy original columns 4, 5, 11, 15 into simplified columns 5, 6, 7, 8
         corners_withsemantics_simplified[:, 5] = corners_withsemantics[:, 4]
         corners_withsemantics_simplified[:, 6] = corners_withsemantics[:, 5]
         corners_withsemantics_simplified[:, 7] = corners_withsemantics[:, 11]

@@ -150,10 +150,13 @@ for test_file in tqdm(test_files):
     # print(gt_i_points_test)
     # print(gt_i_edges_test)
 
-    '''我们当初做实验的时候，气泡图gt的语义的提取具有随机性，但是根据RPLAN数据集的条款，我们没有权利以任何方式公开RPLAN数据集的内容。
-    我们能提供的只有这个提取气泡图数据的脚本。
-    所以你们用相同的脚本提取的气泡图gt的语义与我们自己做实验的时候会有部分不同，但是因为数据集规模较大，最终的性能指标在统计意义上应该不会有太大差异。
-    你们也可以使用get_cycle_basis_and_semantic_3_semansimplified来提取房间语义并自己训练拓扑图相关的模型，get_cycle_basis_and_semantic_3_semansimplified这个方法不是随机的，相比论文中的指标可能会有提升。'''
+    '''Note on semantic extraction randomness:
+    During our original experiments, ground-truth bubble (room) semantics were derived with a procedure containing
+    inherent randomness. Under the RPLAN dataset terms we cannot release any portion of the dataset itself—only this
+    extraction script. Running this same script yourself may yield slightly different bubble semantics compared to
+    those we observed, but given the dataset scale the final aggregate metrics should not differ significantly.
+    Alternatively, you can adopt get_cycle_basis_and_semantic_3_semansimplified which assigns room semantics
+    deterministically and may offer marginal metric improvements relative to the paper's reported numbers.'''
     d_rev_test, simple_cycles_test, simple_cycles_semantics_test = get_cycle_basis_and_semantic_2_semansimplified(
         gt_i_points_test,
         gt_i_edges_test)
@@ -185,8 +188,9 @@ for test_file in tqdm(test_files):
     edgecategory[0] += ((len(adjacency_matrix) * (len(adjacency_matrix) + 1)) / 2) - np.sum(np.triu(np.array(adjacency_matrix)))
 
 
-    # 使用Shoelace公式来计算面积，然后使用重心的公式来计算凹多边形的重心。在考虑邻接性并绘制时，我们可以使用OpenCV图形库。以下是相关的Python代码：
-    # 计算多边形的重心
+    # Use the Shoelace formula to compute area, then the centroid formula to compute the centroid of a concave polygon.
+    # When considering adjacency and drawing we can use the OpenCV library. The related Python code:
+    # Compute the centroid of the polygon
     def get_polygon_centroid(polygon):
         area = 0
         x = 0
@@ -204,11 +208,11 @@ for test_file in tqdm(test_files):
 
 
 
-    # 计算每个多边形的重心
+    # Compute the centroid for each polygon
     centroids = [get_polygon_centroid(polygon[:-1]) for polygon in polygons]
 
 
-    # 保存气泡图的房间多边形（首尾相同）、重心、类型、邻接矩阵。
+    # Save the bubble diagram room polygons (first and last point identical), centroids, types, and adjacency matrix.
     bbdiagram = {}
     bbdiagram['file_id'] = test_graph['file_id']
     bbdiagram['polygons'] = simple_cycles_test

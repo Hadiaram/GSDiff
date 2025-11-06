@@ -117,29 +117,29 @@ for fn in tqdm(bin_imgs):
     bin_img = cv2.imread('rplandata/Data/bin_imgs/' + fn, cv2.IMREAD_GRAYSCALE)
     # Debug (disabled): print count, filename, shape, random pixel value
     # print(count, fn, bin_img.shape, bin_img[random.randint(0, 255), random.randint(0, 255)])
-    # 将读取的图像写入文件以保存
+    # Optionally write raw loaded image to disk for inspection
 
     # cv2.imwrite('./rplandata/Data/t0_' + fn, bin_img)
     # Initialize life variable
     life = 31
     # Loop while life >= 0
     while life >= 0:
-    # Decrement life
+        # Decrement life
         life -= 1
-    # Get connected component count
+        # Get connected component count
         num, labels, stats, centroids = cv2.connectedComponentsWithStats(fix_cv2_bug(bin_img), connectivity=8)
         # print('num', num, stats)
-        # 试图通过腐蚀操作简化图像
-        kernel_erode = np.ones((3, 3)) # 定义腐蚀操作的核
-        eroded = cv2.erode(bin_img, kernel_erode, iterations=1) # 对图像进行腐蚀操作
+        # Attempt to simplify image via erosion
+        kernel_erode = np.ones((3, 3)) # Structuring element for erosion
+        eroded = cv2.erode(bin_img, kernel_erode, iterations=1) # Single erosion iteration
 
-        # 获取腐蚀后的图像的连通区域数量
+        # Count connected components in eroded image
         num_e, labels_e, stats_e, centroids_e = cv2.connectedComponentsWithStats(fix_cv2_bug(eroded), connectivity=8)
-        # 如果腐蚀后图像变成全黑，则认为操作完成
+        # If erosion collapses image to all zeros, treat original as final
         if np.sum(eroded) == 0:
-            # 将未腐蚀的图像设为最终图像
+            # Keep original (non-eroded) image as final representation
             final = bin_img
-            # 尝试移除孤立的白色像素以平滑黑色区域
+            # Remove isolated white pixels (noise) to smooth black regions
             unflattened_patterns_4 = [[[0, 255, 0], [0, 0, 0], [0, 0, 0]],
                                       [[0, 0, 0], [255, 0, 0], [0, 0, 0]],
                                       [[0, 0, 0], [0, 0, 0], [0, 255, 0]],
@@ -147,34 +147,34 @@ for fn in tqdm(bin_imgs):
                                       ]
             for i in range(1, 255):
                 for j in range(1, 255):
-                    # 如果检测到上述模式，则将该部分平滑为黑色
+                    # If local 3x3 patch matches any pattern, zero it out
                     if final[i - 1: i + 2, j - 1: j + 2].tolist() in unflattened_patterns_4:
                         final[i - 1: i + 2, j - 1: j + 2] = 0
-            # 将最终图像写入文件保存
+            # Persist final simplified image
 
             cv2.imwrite('./rplandata/Data/e_imgs/t999_' + fn, final)
-            break # 退出生命周期
+            break # Exit lifecycle loop
         else:
             if num_e < num:
-                # 如果腐蚀后连通区域减少，则忽略腐蚀操作
-                # 使用3x3滑动窗口核识别宽度至少为3个白色像素的区域
+                # If erosion decreases connected component count, ignore erosion attempt
+                # Use 3x3 sliding window kernel to identify segments with width >= 3 white pixels
                 thick_white = np.zeros((256, 256), dtype=bin_img.dtype)
                 for i in range(1, 255):
                     for j in range(1, 255):
                         if (bin_img[i - 1: i + 2, j - 1: j + 2] == 255).all():
                             thick_white[i - 1: i + 2, j - 1: j + 2] = 1
 
-                # 复制原始图像并将宽白色区域添加到其中，从而得到1像素宽的白色线条
+                # Copy original image and add wide white regions to derive 1‑pixel-wide white lines
                 bin_img_copy = copy.deepcopy(bin_img)
                 thin_white = bin_img_copy + thick_white
 
-                # 对细白色线条进行膨胀操作并添加回原图，由于可能会出现值为254的像素，因此需要重新二值化
+                # Dilate thin white lines and add back; pixels with value 254 may appear so re-binarize
                 kernel_dilate = np.ones((3, 3))
                 dilated = cv2.dilate(thin_white, kernel_dilate, iterations=1)
                 bin_img += dilated
                 ret, bin_img = cv2.threshold(bin_img, thresh=128, maxval=255, type=cv2.THRESH_BINARY)
 
-                # 平滑轮廓
+                # Smooth contours
                 unflattened_patterns_3 = [[[255, 255, 255], [255, 0, 255], [0, 0, 0]],
                                         [[0, 0, 0], [255, 0, 255], [255, 255, 255]],
                                         [[255, 255, 0], [255, 0, 0], [255, 255, 0]],
@@ -198,7 +198,7 @@ for fn in tqdm(bin_imgs):
                     for j in range(1, 255):
                         if bin_img[i - 1: i + 2, j - 1: j + 2].tolist() in unflattened_patterns_3:
                             bin_img[i, j] = 255
-                # 平滑轮廓
+                # Smooth contours
                 unflattened_patterns_5 = [[[255, 0, 255], [255, 255, 255], [255, 255, 255]],
                                           [[255, 255, 255], [0, 255, 255], [255, 255, 255]],
                                           [[255, 255, 255], [255, 255, 0], [255, 255, 255]],
@@ -210,32 +210,32 @@ for fn in tqdm(bin_imgs):
                             bin_img[i - 1: i + 2, j - 1: j + 2] = 255
 
             else:
-                # 如果腐蚀后连通区域没有减少，使用腐蚀后的图像继续下一轮循环
+                # If erosion did not reduce connected components, continue next loop with the eroded image
                 bin_img = copy.deepcopy(eroded)
 
 
 
-# 使用2*2白色核心过滤错误数据（从75350降至71814）
+# Use 2x2 white kernel to filter erroneous data (75350 -> 71814)
 
 for fn in tqdm(os.listdir('rplandata/Data/e_imgs')):
-    # 将筛选后的图片复制到新目录
+    # Copy filtered images to new directory
     shutil.copy('rplandata/Data/e_imgs/' + fn, 'rplandata/Data/e_imgs_filteredv1/' + fn.replace('t999_', ''))
 count = 0
 remove1_count = 0
 for fn in tqdm(os.listdir('rplandata/Data/e_imgs_filteredv1')):
     count += 1
-    # 打印当前处理的文件数和文件名
+    # Print current processed file count and filename
     # print(count, fn)
     img = cv2.imread('rplandata/Data/e_imgs_filteredv1/' + fn, cv2.IMREAD_GRAYSCALE)
     if not isvalid(img):
-        # 如果图片不合法（指图片中有2*2白色块，说明腐蚀不彻底）则删除，并计数
+    # If image invalid (contains 2x2 white block => erosion incomplete) delete and count
         os.remove('rplandata/Data/e_imgs_filteredv1/' + fn)
         remove1_count += 1
-        # 打印已删除的文件数量
+    # Print number of removed files
         # print(remove1_count)
 
 
-# 过滤拓扑错误（死胡同）（从71814降至71763）
+# Filter topological errors (dead ends) (71814 -> 71763)
 
 for fn in tqdm(os.listdir('rplandata/Data/e_imgs_filteredv1')):
     shutil.copy('rplandata/Data/e_imgs_filteredv1/' + fn, 'rplandata/Data/e_imgs_filteredv2/' + fn)
@@ -252,7 +252,7 @@ for fn in tqdm(os.listdir('rplandata/Data/e_imgs_filteredv2')):
 
 
 
-# 确保与原始拓扑结构一致（8-连通数）（因此可以自然获得语义和门的信息）（71763维持不变）
+# Ensure consistency with original topology (8-connectivity) so semantics and door info preserved (71763 unchanged)
 
 for fn in tqdm(os.listdir('rplandata/Data/e_imgs_filteredv2')):
     shutil.copy('rplandata/Data/e_imgs_filteredv2/' + fn, 'rplandata/Data/e_imgs_filteredv3/' + fn)
@@ -273,14 +273,14 @@ for fn in tqdm(os.listdir('rplandata/Data/e_imgs_filteredv3')):
 
 
 
-# 提取结构图、内部门、边界、前门、房间语义等信息
-# 定义结构图字典，键为文件名，值为图结构（图结构以字典形式表示，键为(x1, y1)，值为[上，左，下，右]方向的相邻结点坐标(xi, yi)或(-1, -1)表示无邻接结点）
+# Extract structure graph, interior doors, boundary, front door, room semantics, etc.
+# Define structure graph dict: key=file name; value=graph mapping (x1,y1)->[up,left,down,right] neighbor (xi,yi) or (-1,-1) if none
 count = 0
 structure_graphs = {}
 
-# 获取两个角点之间的坐标序列
+# Get coordinate sequence between two corner points
 def get_coords(corner1, corner2):
-    # 如果两个角点在同一列
+    # If the two corners are in the same column
     if corner1[0] == corner2[0]:
         if corner1[1] < corner2[1]:
             return [(corner1[0], i) for i in range(corner1[1], corner2[1] + 1)]
@@ -288,7 +288,7 @@ def get_coords(corner1, corner2):
             return [(corner1[0], i) for i in range(corner2[1], corner1[1] + 1)]
         else:
             assert 0
-    # 如果两个角点在同一行
+    # If the two corners are in the same row
     elif corner1[1] == corner2[1]:
         if corner1[0] < corner2[0]:
             return [(j, corner1[1]) for j in range(corner1[0], corner2[0] + 1)]
@@ -299,7 +299,7 @@ def get_coords(corner1, corner2):
     else:
         assert 0
 
-# 判断坐标序列是否为边界的函数
+# Function to determine whether a coordinate sequence forms a boundary
 def is_edge_func2(coords, corners, img):
     for coord in coords:
         if img[coord[1], coord[0]] == 0 or (coord in corners and coord != coords[0] and coord != coords[-1]):
@@ -307,20 +307,20 @@ def is_edge_func2(coords, corners, img):
     return True
 
 
-# 遍历已过滤的图像，提取结构图
+# Iterate filtered images to extract structure graph
 for fn in tqdm(os.listdir('rplandata/Data/e_imgs_filteredv3')):
     count += 1
     # print(count, fn)
     img = cv2.imread('rplandata/Data/e_imgs_filteredv3/' + fn, cv2.IMREAD_GRAYSCALE)
     try:
-        # 初始化角点列表
+    # Initialize corner list
         corners_L = []
         corners_T = []
         corners_X = []
-        # 提取角点
+    # Extract corner points
         for i in range(1, 255):
             for j in range(1, 255):
-                # 没有I形交点，只考虑L、T、X形交点
+                # Ignore I-shaped intersections; only consider L, T, and X intersections
                 if img[i, j] == 255:
                     # L
                     if img[i - 1, j] + img[i , j - 1] + img[i + 1, j] + img[i, j + 1] == 254 and \
@@ -336,37 +336,37 @@ for fn in tqdm(os.listdir('rplandata/Data/e_imgs_filteredv3')):
                         continue
                 else:
                     continue
-        # 合并所有角点列表
+    # Merge all corner point lists
         corners = []
         corners.extend(corners_L)
         corners.extend(corners_T)
         corners.extend(corners_X)
-        # 提取边界
+    # Extract boundaries
         edges = []
         for corner1 in corners:
             for corner2 in corners:
                 if corner1 != corner2:
-                    # 如果两个角点不在同一行或同一列，则跳过
+                    # Skip if the two corner points are not in the same row or column
                     if not ((corner1[0] == corner2[0]) or (corner1[1] == corner2[1])):
                         continue
                     else:
-                        # 获取两个角点间的坐标序列
+                        # Get the coordinate sequence between the two corner points
                         coords = get_coords(corner1, corner2)
-                        # 如果不是最小墙段
+                        # If not the minimal wall segment
                         if not is_edge_func2(coords, corners, img):
                             continue
                         else:
-                            # 将坐标序列添加到边界列表
+                            # Add the coordinate sequence to the boundary list
                             edges.append((corner1, corner2))
                 else:
                     continue
-        # 将边界转换为结构图
+    # Convert boundaries to a structure graph
         structure_graph = {}
         for corner in corners:
-            # 获取相邻点
+            # Get neighboring points
             adjacents = {}
             for edge in edges:
-                # 判断方向
+                # Determine direction
                 if edge[0] == corner or edge[1] == corner:
                     e_l = list(edge)
                     e_l.remove(corner)
@@ -385,7 +385,7 @@ for fn in tqdm(os.listdir('rplandata/Data/e_imgs_filteredv3')):
                         adjacents['right'] = adjacent
                     else:
                         assert 0
-            # 将相邻点信息添加到结构图
+            # Add neighboring point info to the structure graph
             adjacents_list = []
             for direction in ['up', 'left', 'down', 'right']:
                 if direction in adjacents.keys():
@@ -393,15 +393,15 @@ for fn in tqdm(os.listdir('rplandata/Data/e_imgs_filteredv3')):
                 else:
                     adjacents_list.append((-1, -1))
             structure_graph[corner] = adjacents_list
-        # 将结构图添加到字典中
+    # Add the structure graph to the dictionary
         structure_graphs[int(fn[:-4])] = structure_graph
     except:
         pass
 
-# 将结构图字典保存为.npy文件
+# Save the structure graph dictionary as a .npy file
 np.save('rplandata/Data/structure_graphs.npy', structure_graphs)
 
 
-# 加载看看
+# Load to inspect
 b = np.load('rplandata/Data/structure_graphs.npy', allow_pickle=True).item()
 print(b)

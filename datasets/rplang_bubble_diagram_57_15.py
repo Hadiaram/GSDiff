@@ -42,8 +42,8 @@ class RPlanGBubbleDiagram(Dataset):
             assert 0, 'mode error'
 
         semantics = np.eye(7)[bbdiagram['semantics'] + [0] * (8 - len(bbdiagram['semantics']))].astype(np.float64)
-        # 设计一套规则让每个节点都有一定概率转变为其他类型，边同理。
-        # 我们统计了数据集中每一类节点的类型比例和边的0、1比例，把每一个节点（行向量）乘以以数据集节点分布复制行向量定义的转移矩阵，使得它的下一步满足数据集统计分布。
+    # Design rules so each node (and edge) has some probability to transform to other types.
+    # Compute dataset proportions for each node type and edge 0/1 ratio; multiply each node row vector by a transition matrix built from the distribution so next step matches empirical stats.
         # {0: 0.1512, 1: 0.3833, 2: 0.0071, 3: 0.1403, 4: 0.1603, 5: 0.1578, 6: 0}
         # {0: 0.6489, 1: 0.3511}
         if self.randomize_data:
