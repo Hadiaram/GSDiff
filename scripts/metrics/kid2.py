@@ -1,9 +1,9 @@
 '''
-Demystifying MMD GANs. Authors:Mikołaj Bińkowski, Danica J. Sutherland, Michael Arbel, Arthur Gretton.
+Demystifying MMD GANs. Authors: Mikołaj Bińkowski, Danica J. Sutherland, Michael Arbel, Arthur Gretton.
 
-计算方法：
-1 把gt和pred结果按照完全相同的方式进行渲染
-2 把渲染的两组图片分别放进/images_path1 /images_path2
+Computation method:
+1 Render the gt and pred results in exactly the same way.
+2 Put the two rendered image sets into /images_path1 and /images_path2.
 '''
 from tqdm import tqdm
 import os
@@ -60,9 +60,9 @@ def polynomial_mmd(features_generated, features_real, degree=3, gamma=None, coef
 # start_idx1 = 0
 # for batch1 in tqdm(dataloader1):
 #     batch1 = batch1.to(device) # torch.Size([64, 3, 256, 256])
-#     '''FID的计算器中，我们也是用了inception网络。
-#     inception其实就是特征提取的网络，最后一层输出图像的类别。
-#     不过我们会去除最后的全连接或者池化层，使得我们得到一个2048维度的特征。'''
+#     '''In the FID calculator we also use the Inception network.
+#     Inception is essentially a feature extraction network; the last layer outputs class probabilities.
+#     We remove the final fully connected or pooling layer so we obtain a 2048-dimensional feature vector.'''
 #     with torch.no_grad():
 #         pred1 = model(batch1)[0] # torch.Size([64, 2048, 1, 1])
 #     pred1 = pred1.squeeze(3).squeeze(2).cpu().numpy() # np.ndarray([64, 2048])
@@ -70,7 +70,7 @@ def polynomial_mmd(features_generated, features_real, degree=3, gamma=None, coef
 #     start_idx1 = start_idx1 + batch_size
 #
 #
-# ''' 对另一组图像做同样的操作 '''
+# ''' Do the same operation for the other image set. '''
 # files2 = [os.path.join(path2, fn) for fn in os.listdir(path2)]
 # dataset2 = ImagePathDataset(files2, transforms=TF.ToTensor())
 # dataloader2 = torch.utils.data.DataLoader(dataset2,
@@ -88,7 +88,7 @@ def polynomial_mmd(features_generated, features_real, degree=3, gamma=None, coef
 #     pred_arr2[start_idx2:start_idx2 + batch_size] = pred2
 #     start_idx2 = start_idx2 + batch_size
 #
-# # 使用上面定义的函数计算核 MMD。此时，mmd 就是 KID 得分。
+# # Use the function above to compute the kernel MMD; this mmd is the KID score.
 # mmd = polynomial_mmd(pred_arr1, pred_arr2)
 # print("KID score:", mmd * 1000)
 
@@ -108,16 +108,16 @@ def kid2(path1, path2, kid_batch_size, kid_device):
     start_idx1 = 0
     for batch1 in tqdm(dataloader1):
         batch1 = batch1.to(kid_device)  # torch.Size([64, 3, 256, 256])
-        '''FID的计算器中，我们也是用了inception网络。
-        inception其实就是特征提取的网络，最后一层输出图像的类别。
-        不过我们会去除最后的全连接或者池化层，使得我们得到一个2048维度的特征。'''
+        '''In the FID calculator we also use the Inception network.
+        Inception is essentially a feature extraction network; the last layer outputs the image class.
+        We remove the final fully connected or pooling layer so we obtain a 2048-dimensional feature vector.'''
         with torch.no_grad():
             pred1 = model(batch1)[0]  # torch.Size([64, 2048, 1, 1])
         pred1 = pred1.squeeze(3).squeeze(2).cpu().numpy()  # np.ndarray([64, 2048])
         pred_arr1[start_idx1:start_idx1 + kid_batch_size] = pred1
         start_idx1 = start_idx1 + kid_batch_size
 
-    ''' 对另一组图像做同样的操作 '''
+    ''' Do the same operation for the other image set. '''
     files2 = [os.path.join(path2, fn) for fn in os.listdir(path2)]
     dataset2 = ImagePathDataset(files2, transforms=TF.ToTensor())
     dataloader2 = torch.utils.data.DataLoader(dataset2,
@@ -135,6 +135,6 @@ def kid2(path1, path2, kid_batch_size, kid_device):
         pred_arr2[start_idx2:start_idx2 + kid_batch_size] = pred2
         start_idx2 = start_idx2 + kid_batch_size
 
-    # 使用上面定义的函数计算核 MMD。此时，mmd 就是 KID 得分。
+    # Use the function above to compute the kernel MMD; this mmd is the KID score.
     mmd = polynomial_mmd(pred_arr1, pred_arr2)
     return mmd * 1000

@@ -16,6 +16,7 @@ from datasets.lifull import lifull
 from gsdiff.heterhouse_75_106_lifull import HeterHouseModel
 from gsdiff.heterhouse_56_11_lifull import EdgeModel
 from gsdiff.utils import *
+from gsdiff.utils_lifull import get_cycle_basis_and_semantic_3_semansimplified_lifull
 import torch.nn.functional as F
 from scripts.metrics.fid import fid
 from scripts.metrics.kid2 import kid2
@@ -23,11 +24,11 @@ from scripts.metrics.kid2 import kid2
 
 diffusion_steps = 1000
 lr = 1e-4
-weight_decay = 0 # 以后还是把它加上
+weight_decay = 0 # Consider enabling weight decay later
 total_steps = 1000000
 batch_size = 256 # 256
 batch_size_val = 3000 
-device = 'cuda:1' # 服务器
+device = 'cuda:1' # Server GPU
 merge_points = True
 clamp_trick_training = True
 
@@ -36,29 +37,29 @@ def map_to_binary(tensor):
     batch_size, n_values = tensor.shape
     binary_tensor = torch.zeros((batch_size, n_values, 12), dtype=torch.float32, device=tensor.device)
 
-    # 创建一个mask，标记出非99999的值
+    # Create a mask marking values that are not 99999
     mask = tensor != 99999
 
-    # 处理非99999的值
+    # Process values that are not 99999
     valid_values = torch.where(mask, tensor, torch.zeros_like(tensor))
 
-    # 分离整数和小数部分
+    # Split integer and fractional parts
     integer_part = valid_values.floor().to(torch.int32)
     fractional_part = valid_values - integer_part
 
-    # 处理整数部分
+    # Process integer part
     for i in range(8):
         binary_tensor[:, :, 7 - i] = integer_part % 2
         integer_part //= 2
 
-    # 处理小数部分
-    fractional_part *= 16  # 将小数部分扩展到4位二进制数
+    # Process fractional part
+    fractional_part *= 16  # Scale fractional part to 4 binary digits
     fractional_part = fractional_part.floor().to(torch.int32)
     for i in range(4):
         binary_tensor[:, :, 11 - i] = fractional_part % 2
         fractional_part //= 2
 
-    # 使用mask确保原始为99999的值在二值向量中为0
+    # Use mask so original 99999 entries become zeros in the encoded vector
     binary_tensor = torch.where(mask.unsqueeze(-1), binary_tensor, torch.zeros_like(binary_tensor))
 
     return binary_tensor
@@ -67,29 +68,29 @@ def map_to_fournary(tensor):
     batch_size, n_values = tensor.shape
     fournary_tensor = torch.zeros((batch_size, n_values, 6), dtype=torch.float32, device=tensor.device)
 
-    # 创建一个mask，标记出非99999的值
+    # Create a mask marking values that are not 99999
     mask = tensor != 99999
 
-    # 处理非99999的值
+    # Process values that are not 99999
     valid_values = torch.where(mask, tensor, torch.zeros_like(tensor))
 
-    # 分离整数和小数部分
+    # Split integer and fractional parts
     integer_part = valid_values.floor().to(torch.int32)
     fractional_part = valid_values - integer_part
 
-    # 处理整数部分
+    # Process integer part
     for i in range(4):
         fournary_tensor[:, :, 3 - i] = integer_part % 4
         integer_part //= 4
 
-    # 处理小数部分
-    fractional_part *= 16  # 将小数部分扩展到2位4进制数
+    # Process fractional part
+    fractional_part *= 16  # Scale fractional part to 2 base-4 digits
     fractional_part = fractional_part.floor().to(torch.int32)
     for i in range(2):
         fournary_tensor[:, :, 5 - i] = fractional_part % 4
         fractional_part //= 4
 
-    # 使用mask确保原始为99999的值在二值向量中为0
+    # Use mask so original 99999 entries become zeros in the encoded vector
     fournary_tensor = torch.where(mask.unsqueeze(-1), fournary_tensor, torch.zeros_like(fournary_tensor))
 
     return fournary_tensor
@@ -98,29 +99,29 @@ def map_to_eightnary(tensor):
     batch_size, n_values = tensor.shape
     eightnary_tensor = torch.zeros((batch_size, n_values, 5), dtype=torch.float32, device=tensor.device)
 
-    # 创建一个mask，标记出非99999的值
+    # Create a mask marking values that are not 99999
     mask = tensor != 99999
 
-    # 处理非99999的值
+    # Process values that are not 99999
     valid_values = torch.where(mask, tensor, torch.zeros_like(tensor))
 
-    # 分离整数和小数部分
+    # Split integer and fractional parts
     integer_part = valid_values.floor().to(torch.int32)
     fractional_part = valid_values - integer_part
 
-    # 处理整数部分
+    # Process integer part
     for i in range(3):
         eightnary_tensor[:, :, 2 - i] = integer_part % 8
         integer_part //= 8
 
-    # 处理小数部分
-    fractional_part *= 64  # 将小数部分扩展到2位8进制数
+    # Process fractional part
+    fractional_part *= 64  # Scale fractional part to 2 base-8 digits
     fractional_part = fractional_part.floor().to(torch.int32)
     for i in range(2):
         eightnary_tensor[:, :, 4 - i] = fractional_part % 8
         fractional_part //= 8
 
-    # 使用mask确保原始为99999的值在二值向量中为0
+    # Use mask so original 99999 entries become zeros in the encoded vector
     eightnary_tensor = torch.where(mask.unsqueeze(-1), eightnary_tensor, torch.zeros_like(eightnary_tensor))
 
     return eightnary_tensor
@@ -129,29 +130,29 @@ def map_to_sxtnary(tensor):
     batch_size, n_values = tensor.shape
     sxtnary_tensor = torch.zeros((batch_size, n_values, 3), dtype=torch.float32, device=tensor.device)
 
-    # 创建一个mask，标记出非99999的值
+    # Create a mask marking values that are not 99999
     mask = tensor != 99999
 
-    # 处理非99999的值
+    # Process values that are not 99999
     valid_values = torch.where(mask, tensor, torch.zeros_like(tensor))
 
-    # 分离整数和小数部分
+    # Split integer and fractional parts
     integer_part = valid_values.floor().to(torch.int32)
     fractional_part = valid_values - integer_part
 
-    # 处理整数部分
+    # Process integer part
     for i in range(2):
         sxtnary_tensor[:, :, 1 - i] = integer_part % 16
         integer_part //= 16
 
-    # 处理小数部分
-    fractional_part *= 16  # 将小数部分扩展到1位16进制数
+    # Process fractional part
+    fractional_part *= 16  # Scale fractional part to 1 hexadecimal digit
     fractional_part = fractional_part.floor().to(torch.int32)
     for i in range(1):
         sxtnary_tensor[:, :, 2 - i] = fractional_part % 16
         fractional_part //= 16
 
-    # 使用mask确保原始为99999的值在二值向量中为0
+    # Use mask so original 99999 entries become zeros in the encoded vector
     sxtnary_tensor = torch.where(mask.unsqueeze(-1), sxtnary_tensor, torch.zeros_like(sxtnary_tensor))
 
     return sxtnary_tensor
@@ -204,12 +205,12 @@ dataloader_val_for_gt_rendering = DataLoader(dataset_val_for_gt_rendering, batch
                         drop_last=False, pin_memory=False)  # try different num_workers to be faster
 dataloader_val_iter_for_gt_rendering = iter(cycle(dataloader_val_for_gt_rendering))
 
-'''为了在验证集上计算FID、KID等指标，需要先把验证集渲染。'''
+'''Render the validation set first so we can compute FID / KID metrics.'''
 gt_dir_val = output_dir + 'val_gt' + '/'
 if os.path.exists(gt_dir_val):
-    shutil.rmtree(gt_dir_val)  # 删除路径
-os.makedirs(gt_dir_val)  # 创建路径
-# 验证集的3000个样本逐一渲染成图片
+    shutil.rmtree(gt_dir_val)  # Remove existing directory
+os.makedirs(gt_dir_val)  # Create directory
+# Render each of the ~3000 validation samples to an image
 # colors = {6: (0, 0, 0), 0: (222, 241, 244), 1: (159, 182, 234), 2: (92, 112, 107), 3: (95, 122, 224),
 #               4: (123, 121, 95), 5: (143, 204, 242)}
 colors = {1: (0, 0, 220),
@@ -251,7 +252,7 @@ for batch_count in tqdm(range(batch_numbers)):
         edges_val_depadded = np.concatenate((1 - edges_val_depadded, edges_val_depadded), axis=2)
 
         ''' get planar cycles'''
-        # 形状为 (1, n, 14) 的 ndarray，包含 0 和 1;找到每个子数组中 1 所在的索引,用 99999 替换值为 0 的原始元素
+    # Shape (1, n, 14) ndarray of 0/1; map one-hot indices, replace zeros with 99999 sentinel
         semantics_gt_i_transform_val = semantics_0_val_depadded
         semantics_gt_i_transform_indices_val = np.indices(semantics_gt_i_transform_val.shape)[-1]
         semantics_gt_i_transform_val = np.where(semantics_gt_i_transform_val == 1,
@@ -268,7 +269,7 @@ for batch_count in tqdm(range(batch_numbers)):
             gt_i_points_val,
             gt_i_edges_val)
 
-        # 创建一个256x256的全白图片
+    # Create a 256x256 white image canvas
         img = np.ones((256, 256, 3), np.uint8) * 255
 
         # draw
@@ -280,15 +281,15 @@ for batch_count in tqdm(range(batch_numbers)):
                     p1 = (point[0], point[1])
                     cv2.rectangle(img, (p1[0] - 3, p1[1] - 3), (p1[0] + 3, p1[1] + 3), color=(150, 150, 150), thickness=-1)
                     p2 = (polygon[point_i + 1][0], polygon[point_i + 1][1])
-                    cv2.line(img, p1, p2, color=(150, 150, 150), thickness=5) # 这个地方设成5输出的才是7个像素宽
+                    cv2.line(img, p1, p2, color=(150, 150, 150), thickness=5) # thickness=5 produces a 7‑pixel wide line
 
         cv2.imwrite(os.path.join(gt_dir_val, f"val_gt_{val_count}.png"), img)
 
-print('验证集渲染完毕！')
+print('Validation set rendering finished!')
 
 '''Neural Network'''
 model = HeterHouseModel().to(device)
-print('一阶段模型参数量：', sum(p.numel() for p in model.parameters()))
+print('Stage-1 model parameter count:', sum(p.numel() for p in model.parameters()))
 '''Optim'''
 optimizer = AdamW(list(model.parameters()), lr=lr, weight_decay=weight_decay)
 '''Training'''
@@ -338,7 +339,7 @@ while step < total_steps:
     corners_withsemantics_target2 = corners_withsemantics_0
 
     '''calculate loss. '''
-    # 噪声L2
+    # Noise L2 loss
     corners_loss_masked1 = (corners_withsemantics_target1 - output_corners_withsemantics) ** 2
 
     # x0 L2
@@ -351,59 +352,59 @@ while step < total_steps:
                 corners_withsemantics_t) * output_corners_withsemantics
     )
 
-    if clamp_trick_training: # 能收敛
+    if clamp_trick_training: # Converges
         pred_xstart_coord = torch.clamp(pred_xstart[:, :, 0:2], min=-1, max=1)
         pred_xstart_seman = pred_xstart[:, :, 2:] >= 0.5
         pred_xstart_cs = torch.cat((pred_xstart_coord, pred_xstart_seman), dim=2)
-    else: # 不收敛
+    else: # Does not converge
         pred_xstart_coord = pred_xstart[:, :, 0:2]
         pred_xstart_seman = pred_xstart[:, :, 2:]
         pred_xstart_cs = torch.cat((pred_xstart_coord, pred_xstart_seman), dim=2)
 
     # corners_loss_masked2 = (corners_withsemantics_target2 - pred_xstart_cs) ** 2
 
-    # 局部/全局 对齐/重叠 的时间权重，batch(bs, 53, 2+7+1)内每个样本相同。t=0权重接近1，t=1000权重接近0
+    # Time weights for local/global alignment; per-sample identical. Weight ~1 at t=0; decays toward 0 near t=1000
     time_weight = torch.tensor(betas.tolist()[::-1], dtype=torch.float64, device=device)
-    # 我们先求出局部对齐的loss，再乘以时间权重
+    # First compute local alignment loss, then multiply by the time weight
     # print(pred_xstart_cs)
 
-    # 根据最后一列是否为0来筛选出对应的行
+    # Select rows where the last column equals 0
     mask = pred_xstart_cs[:, :, -1] == 0
 
-    # 仅选择最后一列为0的行的前两列（x和y坐标）
+    # Keep only the first two columns (x,y) for rows passing the mask
     x_coords = pred_xstart_cs[:, :, 0] * mask
     y_coords = pred_xstart_cs[:, :, 1] * mask
 
-    # 设置mask中的False值为无穷大，以便在计算距离时排除这些值
+    # Set False mask positions to +inf so they are excluded in distance computation
     inf_mask = torch.where(mask, 0, float('inf'))
     x_coords += inf_mask
     y_coords += inf_mask
 
-    # 计算 x 坐标的 L1 距离方阵
+    # L1 distance matrix for x coordinates
     x_coords_uns = x_coords.unsqueeze(2)
     distance_matrix_x = torch.abs(x_coords_uns - x_coords_uns.transpose(1, 2))
 
-    # 计算 y 坐标的 L1 距离方阵
+    # L1 distance matrix for y coordinates
     y_coords_uns = y_coords.unsqueeze(2)
     distance_matrix_y = torch.abs(y_coords_uns - y_coords_uns.transpose(1, 2))
 
-    # 设置无穷大和 NaN 值为99999
+    # Replace inf / NaN with 99999 sentinel
     distance_matrix_x[torch.isinf(distance_matrix_x) | torch.isnan(distance_matrix_x)] = 99999
     distance_matrix_y[torch.isinf(distance_matrix_y) | torch.isnan(distance_matrix_y)] = 99999
-    # 对角线使用掩码填充99999
+    # Fill diagonal with 99999
     distance_matrix_x[(torch.eye(53).unsqueeze(0) == 1).to(device).expand(distance_matrix_x.size(0), 53, 53)] = 99999
     distance_matrix_y[(torch.eye(53).unsqueeze(0) == 1).to(device).expand(distance_matrix_y.size(0), 53, 53)] = 99999
     # print(distance_matrix_x)
     # print(distance_matrix_y)
-    # 计算每个节点 i 的所有 x, y 轴向距离的最小值
+    # Minimum per-node distance along x and y axes
     min_values_x, _ = torch.min(distance_matrix_x, dim=2)
     min_values_y, _ = torch.min(distance_matrix_y, dim=2)
     # print(min_values_x.shape) # (bs, 53)
     # print(min_values_y.shape) # (bs, 53)
-    # LACE原文：求同一个节点i对其他节点（53）的所有方向（2）中距离（106）最小的
+    # From LACE paper: min distance among all directions for node i
     min_values = torch.stack((min_values_x, min_values_y), dim=2)
     min_values, _ = torch.min(min_values, dim=2)
-    # print(min_values[29]) # (bs, 53) 包含99999,那代表节点为padding节点
+    # 99999 indicates a padding node
     min_values_unnorm = torch.where(min_values != 99999, min_values * 128, torch.tensor(0.0, dtype=min_values.dtype, device=device))
     # print(min_values_unnorm[29])
     min_values_bin_masked = map_to_binary(min_values_unnorm)
@@ -418,13 +419,11 @@ while step < total_steps:
 
 
 
-    # 对于每个样本，将非99999的元素套上g=-2log(1-(0.5-eps)x)
-    # 应用函数 -2log(1-0.5x) 到非99999的元素
-    # 注意：确保输入到log的值是正数，即1-0.5x > 0 # 这个x是距离所以一定大于等于0, 因为归一化L1距离一定小于等于2
-    # 99999这里会直接变成0，没有影响
-    # 再乘以时间权重
-    # 12位按位回归，最大值是12
-    # 不能干扰了主loss，无限进制下是[0, 255]->[0, 2]的距离，二进制这里变成了[0, 12]，我们给这个除以128，以与无限进制下的距离对齐
+    # Apply g = -2log(1 - (0.5 - eps) * x) to each non-99999 element.
+    # Ensure argument of log stays positive (x>=0 and normalized L1 <=2 so safe).
+    # 99999 entries map to 0 and do not affect the loss.
+    # Multiply by the time weight.
+    # Scale factors (12,18,35,45,2) correspond to different radix encodings; divide by 128 to align scale with original distance range.
     masked_tensor_bin = ((-12 * torch.log(1 - (1 / 12 - 1e-8) * min_values_bin_masked.sum(2)).sum(1) * time_weight[
         t]).sum() / 128) / batch_size
     masked_tensor_four = ((-18 * torch.log(1 - (1 / 18 - 1e-8) * min_values_four_masked.sum(2)).sum(1) * time_weight[
@@ -435,11 +434,11 @@ while step < total_steps:
         t]).sum() / 128) / batch_size
     masked_tensor_inf = (torch.where(min_values != 99999, -2 * torch.log(1 - (0.5 - 1e-8) * min_values),
                                 torch.tensor(0.0, dtype=min_values.dtype, device=device)).sum(1) * time_weight[t]).sum() / batch_size
-    # 对结果求和
+    # Sum the components
     local_aligned_loss = masked_tensor_bin + masked_tensor_four + masked_tensor_eight + masked_tensor_sxt + masked_tensor_inf
 
 
-    # 加权
+    # Weighting
     corner_number = torch.ones((batch_size,), device=device) * 53
     corners_loss_masked_avgpergraph1 = corners_loss_masked1.sum(dim=[1, 2]) / corner_number
     # corners_loss_masked_avgpergraph2 = corners_loss_masked2.sum(dim=[1, 2]) / corner_number
@@ -497,7 +496,7 @@ while step < total_steps:
             results_stage1_val['results_corners_' + str(k_val)] = []
             results_stage1_val['results_semantics_' + str(k_val)] = []
             results_stage1_val['results_corners_numbers_' + str(k_val)] = []
-        print('验证集一阶段开始')
+        print('Validation Stage-1 begins')
         if len(dataset_val) % batch_size_val == 0:
             batch_numbers = len(dataset_val) // batch_size_val
         else:
@@ -575,7 +574,7 @@ while step < total_steps:
 
         # print(stage1_0_val)
         '''stage 2'''
-        print('验证集二阶段开始')
+        print('Validation Stage-2 begins')
         # merge points (data loading in actual)
         corners_all_samples_val = stage1_0_val[0]
         semantics_all_samples_val = stage1_0_val[1]
@@ -609,7 +608,7 @@ while step < total_steps:
         # print(semantics_all_samples_val)
 
         # model 2 loading
-        model_path_2 = 'outputs/structure-56-16-interval1000-lifull/' + 'model014000.pt' # 凑合一个就行，这个训完了还得换个更好的边缘模型
+        model_path_2 = 'outputs/structure-56-16-interval1000-lifull/' + 'model014000.pt' # Temporary edge model; will swap for a better one later
         model_2 = EdgeModel().to(device)
         model_2.load_state_dict(torch.load(model_path_2, map_location="cpu"))
         model_2.to(device)
@@ -662,8 +661,8 @@ while step < total_steps:
 
             output_dir_val = output_dir + 'val_' + f'{step:07d}' + '/'
             if os.path.exists(output_dir_val):
-                shutil.rmtree(output_dir_val)  # 删除路径
-            os.makedirs(output_dir_val)  # 创建路径
+                shutil.rmtree(output_dir_val)  # Remove directory
+            os.makedirs(output_dir_val)  # Create directory
             for val_count in tqdm(range(len(dataset_val))):
                 corners_sample_i_val = corners_all_samples_val[val_count]
                 edges_sample_i_val = edges_all_samples_val[val_count]
@@ -677,7 +676,7 @@ while step < total_steps:
                 # print(semantics_sample_i_val)
 
                 ''' get planar cycles'''
-                # 形状为 (1, n, 14) 的 ndarray，包含 0 和 1;找到每个子数组中 1 所在的索引,用 99999 替换值为 0 的原始元素
+                # Shape (1, n, 14) ndarray of 0/1; map one-hot indices, replace zeros with 99999 sentinel
                 semantics_sample_i_transform_val = semantics_sample_i_val
                 semantics_sample_i_transform_indices_val = np.indices(semantics_sample_i_transform_val.shape)[-1]
                 semantics_sample_i_transform_val = np.where(semantics_sample_i_transform_val == 1,
@@ -700,7 +699,7 @@ while step < total_steps:
                 # for scs in simple_cycles_semantics_val:
                 #     print(scs)
 
-                # 创建一个256x256的全白图片
+                # Create a 256x256 white image canvas
                 img = np.ones((256, 256, 3), np.uint8) * 255
 
                 # draw
@@ -714,11 +713,11 @@ while step < total_steps:
                             cv2.rectangle(img, (p1[0] - 3, p1[1] - 3), (p1[0] + 3, p1[1] + 3), color=(150, 150, 150),
                                           thickness=-1)
                             p2 = (polygon[point_i + 1][0], polygon[point_i + 1][1])
-                            cv2.line(img, p1, p2, color=(150, 150, 150), thickness=5)  # 这个地方设成5输出的才是7个像素宽
+                            cv2.line(img, p1, p2, color=(150, 150, 150), thickness=5)  # thickness=5 produces a 7‑pixel wide line
 
                 cv2.imwrite(os.path.join(output_dir_val, f"val_pred_{val_count}.png"), img)
 
-        print('验证集预测图渲染完毕')
+        print('Validation prediction rendering finished')
         '''calculate FID, KID. '''
         current_Fid = fid(gt_dir_val, output_dir_val, fid_batch_size=128, fid_device=device)
         # current_Kid = kid(gt_dir_val, output_dir_val, kid_batch_size=128, kid_device=device)

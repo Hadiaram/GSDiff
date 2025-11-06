@@ -36,7 +36,7 @@ class PositionEmbeddingSine(nn.Module):
 class FrozenBatchNorm2d(torch.nn.Module):
     def __init__(self, n, eps=1e-5):
         super(FrozenBatchNorm2d, self).__init__()
-        # 防止反向传播更新
+        # Prevent backpropagation updates
         self.register_buffer("weight", torch.ones(n))
         self.register_buffer("bias", torch.zeros(n))
         self.register_buffer("running_mean", torch.zeros(n))
@@ -234,7 +234,7 @@ class BoundHeterHouseModel(nn.Module):
         #     nn.InstanceNorm2d(num_features=256, eps=1e-05, affine=True)
         # )
         # self.sinopos = PositionEmbeddingSine()
-        # self.layer_embedding = nn.Parameter(torch.Tensor(3, 256)) # 我们选用了3个尺度的特征图
+    # self.layer_embedding = nn.Parameter(torch.Tensor(3, 256)) # We selected 3 scales of feature maps
 
 
         # self.proj32 = nn.Sequential(
@@ -249,7 +249,7 @@ class BoundHeterHouseModel(nn.Module):
         # self.bn16 = FrozenBatchNorm2d(1024)
         # self.activation = nn.ReLU()
         # self.sinopos = PositionEmbeddingSine()
-        # self.layer_embedding = nn.Parameter(torch.Tensor(2, 256)) # 我们选用了2个尺度的特征图
+    # self.layer_embedding = nn.Parameter(torch.Tensor(2, 256)) # We selected 2 scales of feature maps
 
 
         self.proj16 = nn.Sequential(
@@ -259,7 +259,7 @@ class BoundHeterHouseModel(nn.Module):
         # self.bn16 = FrozenBatchNorm2d(1024)
         # self.activation = nn.ReLU()
         self.sinopos = PositionEmbeddingSine()
-        # self.layer_embedding = nn.Parameter(torch.Tensor(1, 256)) # 我们选用了1个尺度的特征图
+    # self.layer_embedding = nn.Parameter(torch.Tensor(1, 256)) # We selected 1 scale of feature maps
 
 
 
@@ -380,7 +380,7 @@ class BoundHeterHouseModel(nn.Module):
 
 
 
-        # 交叉注意力padding掩码 (bs, 53, 5376)
+    # Cross-attention padding mask (bs, 53, 5376)
         cross_attn_matrix = global_attn_matrix[:, :, 0:1].repeat(1, 1, x.shape[1]).to(x.dtype)
         
 

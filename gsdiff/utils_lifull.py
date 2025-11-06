@@ -10,13 +10,13 @@ import numpy as np
 
 
 def euclidean_edge_match(input_array):
-    # 目标值数组
+    # Target value array for discretizing soft edge predictions
     target_values = np.array([[0, 1], [1, 0]])
-    # 计算欧氏距离
+    # Compute Euclidean distance to both prototypes
     distances = np.linalg.norm(input_array[:, None, :] - target_values, axis=-1)
-    # 找到距离最小值的索引
+    # Argmin over the two prototypes
     min_indices = np.argmin(distances, axis=-1)
-    # 使用索引映射到目标值
+    # Map indices back to one-hot edge representation
     output_array = target_values[min_indices]
     return output_array
 
@@ -62,11 +62,10 @@ def visualize_withsemantic(output_points, output_edges, simple_cycles, simple_cy
     img = np.ones((256, 256, 3), dtype=np.uint8) * 255
     # draw polygons
     for polygon_i, polygon in enumerate(simple_cycles):
-        # 提取有效的x, y坐标
+        # Extract valid (x,y) coordinates for this polygon
         pts = np.array([(x, y) for x, y, *rest in polygon], np.int32)
         pts = pts.reshape((-1, 1, 2))
-
-        # 画多边形
+        # Fill and outline polygon
         cv2.fillPoly(img, [pts], color=colors[simple_cycles_semantics[polygon_i]])
         cv2.polylines(img, [pts], isClosed=True, color=(150, 150, 150), thickness=5)
     # draw corners
@@ -159,7 +158,7 @@ def visualize_33(result_corners_inverse_normalized, result_edges_unpaddinged, ou
     # print(len(result_edges_unpaddinged[0]), len(result_edges_unpaddinged[1])) # 1, 1
     # print(len(result_edges_unpaddinged[0][0]), len(result_edges_unpaddinged[1][0])) # 18 ** 2, 22 ** 2
     # print(result_edges_unpaddinged[0][0][-1], result_edges_unpaddinged[1][0][-1])  # 18 ** 2, 22 ** 2
-    # 需要映射到[0 1]和[1 0]欧氏距离更近的那个点
+    # Discretize edges by mapping to the closer prototype between [0 1] and [1 0]
     result_edges_unpaddinged_discrete = []
     for bs_i in range(len(result_edges_unpaddinged)):
         aaa = []
@@ -216,35 +215,35 @@ def chemistry_visualize(result_atoms_unpaddinged, result_bonds_unpaddinged, outp
         print(result_atoms_unpaddinged[i])
         print(result_bonds_unpaddinged[i].reshape(1, len(result_atoms_unpaddinged[i][0]), len(result_atoms_unpaddinged[i][0]), 5))
 
-        # 原子类型和键类型的 one-hot ndarray
+    # Atom and bond type one-hot ndarrays
         atom_array = result_atoms_unpaddinged[i][0]  # Replace with your atom array
         bond_array = result_bonds_unpaddinged[i][0]  # Replace with your bond array
 
-        # 定义原子符号列表
+    # Define atom symbol list
         atom_symbols = ["C", "N", "O", "F"]
 
-        # 将 one-hot ndarray 转换为分子结构
+    # Convert one-hot arrays to an RDKit molecule
         def ndarray_to_molecule(atom_array, bond_array):
-            # 创建原子列表
+            # Build atom list
             atoms = [atom_symbols[np.argmax(atom_one_hot)] for atom_one_hot in atom_array]
 
-            # 创建空的可编辑分子
+            # Create an editable empty molecule
             mol = Chem.EditableMol(Chem.Mol())
 
-            # 添加原子
+            # Add atoms
             for atom in atoms:
                 mol.AddAtom(Chem.Atom(atom))
 
-            # 添加键(upper trim)
+            # Add bonds (upper triangle only)
             num_atoms = len(atom_array)
             for i in range(num_atoms):
                 for j in range(i + 1, num_atoms):
-                    bond_type = np.argmax(bond_array[i * num_atoms + j])  # 获取键类型（0：无键，1：单键，2：双键，3：三键）
+                    bond_type = np.argmax(bond_array[i * num_atoms + j])  # bond type (0:none,1:single,2:double,3:triple)
                     if bond_type > 0:
                         mol.AddBond(i, j, Chem.BondType.values[bond_type])
 
 
-            # 获取不可编辑的分子
+            # Get immutable molecule and list atoms/bonds
             mol = mol.GetMol()
             for a in mol.GetAtoms():
                 print(a.GetIdx(), a.GetSymbol())
@@ -256,10 +255,10 @@ def chemistry_visualize(result_atoms_unpaddinged, result_bonds_unpaddinged, outp
         mol = ndarray_to_molecule(atom_array, bond_array)
         from rdkit.Chem import Draw
 
-        # 生成2D坐标
+    # Generate 2D coordinates
         AllChem.Compute2DCoords(mol)
 
-        # 展示分子
+    # Render molecule to file
         Draw.MolToFile(mol, output_dir + str(i) + '_' + str(timestep) + '.png', size=(256, 256))
 
 def inverse_normalize_remove_padding(result_corners, results_edges, results_corners_numbers):
@@ -319,9 +318,9 @@ def inverse_normalize_and_remove_padding(result_corners, result_semantics, resul
     return result_corners_inverse_normalized, result_semantics_inverse_normalized
 
 def inverse_normalize_and_remove_padding_100(result_corners, result_semantics, results_corners_numbers):
-    # print(result_corners) # 长度3000, 每个元素(1, 53, 2) tensor
-    # print(result_semantics) # 长度3000, 每个元素(1, 53, 8) tensor
-    # print(results_corners_numbers) # 长度3000, 每个元素(53, ) tensor, 里面的值是0代表是角点，1代表非角点
+    # print(result_corners) # length 3000, each element (1,53,2) tensor
+    # print(result_semantics) # length 3000, each element (1,53,8) tensor
+    # print(results_corners_numbers) # length 3000, each (53,) tensor; 0=corner, 1=non-corner
 
 
     result_corners_inverse_normalized = []
@@ -351,9 +350,9 @@ def inverse_normalize_and_remove_padding_4testing(result_corners, result_semanti
     return result_corners_inverse_normalized, result_semantics_inverse_normalized
 
 def inverse_normalize_and_remove_padding_100_4testing(result_corners, result_semantics, results_corners_numbers, resolution=512):
-    # print(result_corners) # 长度3000, 每个元素(1, 53, 2) tensor
-    # print(result_semantics) # 长度3000, 每个元素(1, 53, 8) tensor
-    # print(results_corners_numbers) # 长度3000, 每个元素(53, ) tensor, 里面的值是0代表是角点，1代表非角点
+    # print(result_corners) # length 3000, each element (1,53,2) tensor
+    # print(result_semantics) # length 3000, each element (1,53,8) tensor
+    # print(results_corners_numbers) # length 3000, each (53,) tensor; 0=corner,1=non-corner
 
     result_corners_inverse_normalized = []
     for i, result in enumerate(result_corners):
@@ -423,8 +422,8 @@ def masked_softmax(x, mask, **kwargs):
     return torch.softmax(x_masked, **kwargs)
 
 def get_quadrant(angle):
-    # 角占每个象限的多少度（理论上两个向量不会重合）
-    if angle[0] < angle[1]: # 角1
+    # Angle span across quadrants (two vectors assumed non-overlapping)
+    if angle[0] < angle[1]: # case 1
         if 0 <= angle[0] < 90 and 0 <= angle[1] < 90:
             quadrant = (angle[1] - angle[0], 0, 0, 0)
         elif 0 <= angle[0] < 90 and 90 <= angle[1] < 180:
@@ -445,7 +444,7 @@ def get_quadrant(angle):
             quadrant = (0, 0, 270 - angle[0], angle[1] - 270)
         elif 270 <= angle[0] < 360 and 270 <= angle[1] < 360:
             quadrant = (0, 0, 0, angle[1] - angle[0])
-    else: # 角2
+    else: # case 2
         if 0 <= angle[1] < 90 and 0 <= angle[0] < 90:
             quadrant_ = (angle[0] - angle[1], 0, 0, 0)
         elif 0 <= angle[1] < 90 and 90 <= angle[0] < 180:
@@ -469,7 +468,7 @@ def get_quadrant(angle):
         quadrant = (90 - quadrant_[0], 90 - quadrant_[1], 90 - quadrant_[2], 90 - quadrant_[3])
     return quadrant
 
-def poly_area(points): # 计算逆时针凹多边形面积，顺时针则为负数
+def poly_area(points): # Oriented polygon area (counter-clockwise positive, clockwise negative)
     s = 0
     points_count = len(points)
     for i in range(points_count):
@@ -488,7 +487,7 @@ def rotate_degree_counterclockwise_from_counter_degree(src_degree, dest_degree):
 
 
 def x_axis_angle(y):
-    # 以图像坐标系为准，(1,0)方向记为0度，逆时针绕一圈到360度
+    # Image coordinate frame: (1,0) mapped to 0 degrees; measure counter-clockwise to 360 degrees
     # print('-------------')
     # print(y)
     y_right_hand = (y[0], -y[1])
@@ -509,7 +508,7 @@ def x_axis_angle(y):
 def get_results_float_with_semantic(best_result):
     if 1:
         preds = best_result[2]
-        # 所有点、边
+        # All points and edges
         output_points = []
         output_edges = []
         for triplet in preds:
@@ -542,13 +541,13 @@ def get_results_float_with_semantic(best_result):
         return output_points, output_edges
 
 def get_cycle_basis_and_semantic_2(output_points, output_edges):
-    # 一个关于索引和输出点的字典
+    # Build a mapping from point tuple to index
     d = {}
     for output_point_index, output_point in enumerate(output_points):
-        d[output_point] = output_point_index  # 这里无法处理重复点，不能去掉nms
+        d[output_point] = output_point_index  # Cannot handle duplicate points; upstream NMS required
     d_rev = {}
     for output_point_index, output_point in enumerate(output_points):
-        d_rev[output_point_index] = output_point  # 这里无法处理重复点，不能去掉nms
+        d_rev[output_point_index] = output_point  # Cannot handle duplicate points; upstream NMS required
     es = []
     for output_edge in output_edges:
         es.append((d[output_edge[0]], d[output_edge[1]]))
@@ -564,9 +563,9 @@ def get_cycle_basis_and_semantic_2(output_points, output_edges):
     simple_cycles = []
     simple_cycles_number = []
     simple_cycles_semantics = []
-    # print('断点1', simple_cycles)
+    # Debug: initial simple_cycles container
     bridges = list(nx.bridges(G))
-    # 虚边怎么做呢：还是直接删掉，从边集中删掉，然后作为多个连通的预测处理即可
+    # Remove bridge edges so remaining components are either isolated points or cycles
     for b in bridges:
         if (d_rev[b[0]], d_rev[b[1]]) in output_edges:
             output_edges.remove((d_rev[b[0]], d_rev[b[1]]))
@@ -576,7 +575,7 @@ def get_cycle_basis_and_semantic_2(output_points, output_edges):
             output_edges.remove((d_rev[b[1]], d_rev[b[0]]))
             es.remove((b[1], b[0]))
             G.remove_edge(b[1], b[0])
-    # 断掉割边集以后，我们查看剩下的所有连通分量，此时只存在孤立点或圈，遍历剩下的所有圈
+    # After removing bridges, traverse each remaining connected component (isolated node or cycle)
     connected_components = list(nx.connected_components(G))
 
 
@@ -588,24 +587,24 @@ def get_cycle_basis_and_semantic_2(output_points, output_edges):
             simple_cycles_number_c = []
             simple_cycle_semantics_c = []
             # print(c) # {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23}
-            # 获取对应的点边集
+            # Get corresponding point and edge sets
             output_points_c = [p for p in output_points if d[p] in c]
-            output_edges_c = [e for e in output_edges if d[e[0]] in c or d[e[1]] in c]  # 固定的边集，不会删除
-            output_edges_c_copy_for_traversing = copy.deepcopy(output_edges_c)  # 用于遍历以减少时间复杂度的边集，其中的边会删除
+            output_edges_c = [e for e in output_edges if d[e[0]] in c or d[e[1]] in c]  # Fixed edge set (not deleted)
+            output_edges_c_copy_for_traversing = copy.deepcopy(output_edges_c)  # Working copy for traversal; edges removed to reduce complexity
             # print(output_points_c)
             # print(output_edges_c)
 
-            # 求该连通分量所有逆时针simple cycles的方法
-            # 定义d中的编号为该连通分量中点的编号，
-            # 遍历无向边集output_edges_c：
-            # 对每条无向边，规定初始点为编号较小者，上一个点为初始点，当前点为编号较大者；
-            # 求当前点的所有邻边，及对应的出射角度
-            # 求上一个点入射到当前点的方向的反方向，对应的角度（最常见的极坐标系[0,2pi)）
-            # 求从这个角度开始逆时针旋转，碰到的最后一个当前点的邻边
-            # 将该邻边的另一端作为下一个点
-            # 当下一个点等于初始点时，得到形式类似[p0,p1,...,pn-1,p0]的cycle
-            # 检索cycle，从剩下的边中删除所有pi<pi+1的边（包括本边），遍历剩下的边
-            # 将上一个点设为当前点，当前点设为下一个点
+            # Method to enumerate every counter-clockwise simple cycle in this connected component
+            # Use d's indices as identifiers for points in this connected component
+            # Iterate through the undirected edge set output_edges_c:
+            # For each undirected edge: set the initial point to the endpoint with the smaller index; previous = initial, current = larger index.
+            # Collect all neighbor edges of the current point and compute their outgoing (polar) angles.
+            # Compute the reverse (outgoing) direction of the vector from last_point to current_point; get its angle in [0, 2pi).
+            # Rotate counter‑clockwise starting from that angle to find the last (rightmost before wrap) neighbor edge of current_point.
+            # Take the opposite endpoint of that chosen edge as the next point.
+            # When next_point equals the initial point, we obtain a cycle of the form [p0, p1, ..., p_{n-1}, p0].
+            # After recording a cycle, remove from the remaining edge set every oriented edge (pi, pi+1) with pi < pi+1 (including the starting edge) to avoid duplicates.
+            # Update: last_point = current_point; current_point = next_point; continue traversal.
 
             for edge_c in output_edges_c:
                 if edge_c not in output_edges_c_copy_for_traversing:
@@ -618,7 +617,7 @@ def get_cycle_basis_and_semantic_2(output_points, output_edges):
                     point2 = edge_c[1]
                     point1_number = d[point1]
                     point2_number = d[point2]
-                    # 初始点
+                    # Initial point
                     initial_point = None
                     initial_point_number = None
                     if point1_number < point2_number:
@@ -629,10 +628,10 @@ def get_cycle_basis_and_semantic_2(output_points, output_edges):
                         initial_point_number = point2_number
                     simple_cycle.append(initial_point)
                     simple_cycle_number.append(initial_point_number)
-                    # 上一个点
+                    # Previous point
                     last_point = initial_point
                     last_point_number = initial_point_number
-                    # 当前点
+                    # Current point
                     current_point = None
                     current_point_number = None
                     if point1_number < point2_number:
@@ -643,23 +642,23 @@ def get_cycle_basis_and_semantic_2(output_points, output_edges):
                         current_point_number = point1_number
                     simple_cycle.append(current_point)
                     simple_cycle_number.append(current_point_number)
-                    # 初始点的后一个点（用于判断while结束）
+                    # The successor of the initial point (used to decide when the while loop terminates)
                     next_initial_point = copy.deepcopy(current_point)
                     next_initial_point_number = copy.deepcopy(current_point_number)
-                    # 下一个点
+                    # Next point placeholder
                     next_point = None
                     next_point_number = None
-                    # 当下一个点等于初始点的后一个点时，结束
+                    # Loop until next_point equals next_initial_point (i.e., we closed the cycle)
                     while next_point != next_initial_point:
-                        # 求当前点的所有邻边
+                        # Collect all neighbor edges of the current point
                         relevant_edges = []
                         for edge in output_edges_c:
                             if (edge[0] == current_point or edge[1] == current_point) and (not (edge[0] == current_point and edge[1] == current_point)):
                                 relevant_edges.append(edge)
-                        # 求当前点的所有邻边对应的出射角度
+                        # Compute outgoing angles for each neighbor edge
                         relevant_edges_degree = []
                         for relevant_edge in relevant_edges:
-                            # 出射向量
+                            # Outgoing vector
                             vec = None
                             if relevant_edge[0] == current_point:
                                 vec = (
@@ -669,10 +668,10 @@ def get_cycle_basis_and_semantic_2(output_points, output_edges):
                                 relevant_edge[0][0] - relevant_edge[1][0], relevant_edge[0][1] - relevant_edge[1][1])
                             else:
                                 assert 0
-                            # 求出射角度
+                            # Compute outgoing angle
                             vec_degree = x_axis_angle(vec)
                             relevant_edges_degree.append(vec_degree)
-                        # 求上一个点入射到当前点的方向的反方向（出射方向）、对应出射角度
+                        # Compute reverse (outgoing) direction from last_point to current_point and its angle
                         vec_from_current_point_to_last_point = None
                         vec_from_current_point_to_last_point_degree = None
                         for relevant_edge_ind, relevant_edge in enumerate(relevant_edges):
@@ -690,11 +689,11 @@ def get_cycle_basis_and_semantic_2(output_points, output_edges):
                                 relevant_edges_degree.remove(vec_from_current_point_to_last_point_degree)
                             else:
                                 continue
-                        # 求从这个角度开始逆时针旋转，碰到的最后一个当前点的邻边
-                        # 同时把没扫过部分（就是内角）的角度区域记录下来
-                        # 这里我们的内角语义替换为完全语义
+                        # Rotate counter‑clockwise from that angle to the last encountered neighbor edge (defines interior corner)
+                        # Record the untouched swept region (the interior angle interval)
+                        # (Here we substitute full semantics for the interior angle semantics)
                         rotate_deltas_counterclockwise = []
-                        # 记录内角区域，逆时针，从前一个角度到后一个角度
+                        # Store interior angle interval (counter‑clockwise) from previous direction to candidate direction
                         interior_angles = []
                         for relevant_edge_degree in relevant_edges_degree:
                             rotate_delta = rotate_degree_counterclockwise_from_counter_degree(
@@ -702,12 +701,12 @@ def get_cycle_basis_and_semantic_2(output_points, output_edges):
                             rotate_deltas_counterclockwise.append(rotate_delta)
                             interior_angles.append((relevant_edge_degree, vec_from_current_point_to_last_point_degree))
                         # print(rotate_deltas_counterclockwise)
-                        # 最大角对应索引
+                        # Index of maximum CCW rotation
                         max_rotate_index = rotate_deltas_counterclockwise.index(max(rotate_deltas_counterclockwise))
-                        # 找到对应的内角
+                        # Interior angle (as a pair of boundary directions)
                         interior_angle_counterclockwise = interior_angles[max_rotate_index]
-                        # 求出对应的语义区域
-                        # 先求出当前点的所有语义，顺序按照四个象限排序
+                        # Determine semantic region for this angle
+                        # First gather all semantic channels of current point ordered by quadrants
                         # current_point_semantic = [current_point[3], current_point[2], current_point[5],
                         #                           current_point[4], ]
                         current_point_semantic = [current_point[3], current_point[2], current_point[5],
@@ -715,12 +714,11 @@ def get_cycle_basis_and_semantic_2(output_points, output_edges):
                                                   current_point[8], current_point[9], current_point[10],
                                                   current_point[11], current_point[12], current_point[13],
                                                   current_point[14], current_point[15]]
-                        # 求出该逆时针角占了四个象限的多少角度
-                        # 求法：直接求度数较小的逆时针转到度数较大的覆盖四象限角度
-                        # 然后判断，如果度数较小的是内角区域的“源方向”，则正好是覆盖四象限角度；
-                        # 如果度数较小的是内角区域的“目标方向”，则对覆盖四象限角度用90度减去；
-                        interior_angle_counterclockwise_degree_smaller = min(interior_angle_counterclockwise)  # 度数较小的
-                        interior_angle_counterclockwise_degree_bigger = max(interior_angle_counterclockwise)  # 度数较大的
+                        # Compute how much of each quadrant this CCW angle spans:
+                        # Take smaller->larger angle extent; if smaller is the source direction use it directly;
+                        # if smaller is the target direction subtract from 90 degrees.
+                        interior_angle_counterclockwise_degree_smaller = min(interior_angle_counterclockwise)  # smaller angle
+                        interior_angle_counterclockwise_degree_bigger = max(interior_angle_counterclockwise)  # larger angle
                         quadrant_smaller_to_bigger_counterclockwise = get_quadrant(
                             (interior_angle_counterclockwise_degree_smaller,
                              interior_angle_counterclockwise_degree_bigger))
@@ -735,19 +733,19 @@ def get_cycle_basis_and_semantic_2(output_points, output_edges):
                             90 - quadrant_smaller_to_bigger_counterclockwise[3])
                         else:
                             assert 0
-                        # 永远不将语义置为-1
+                        # Never set semantics to -1 here
                         current_point_semantic_valid = []
                         for qd, seman in enumerate(current_point_semantic):
                             if 1:
                                 current_point_semantic_valid.append(seman)
                             else:
                                 current_point_semantic_valid.append(-1)
-                        # 对全部语义进行统计
+                        # Record all semantics for this step
                         simple_cycle_semantics.append(current_point_semantic_valid)
 
-                        # 对应边
+                        # Chosen edge (max rotation)
                         max_rotate_edge = relevant_edges[max_rotate_index]
-                        # 对应下一个点
+                        # Determine next point
                         if max_rotate_edge[0] == current_point:
                             next_point = max_rotate_edge[1]
                             next_point_number = d[next_point]
@@ -756,17 +754,17 @@ def get_cycle_basis_and_semantic_2(output_points, output_edges):
                             next_point_number = d[next_point]
                         else:
                             assert 0
-                        # 重新给上一个点、当前点、下一个点赋值，并将当前点加入simple_cycle
+                        # Update last/current and append current point to the simple cycle list
                         last_point = current_point
                         last_point_number = current_point_number
                         current_point = next_point
                         current_point_number = next_point_number
                         simple_cycle.append(current_point)
                         simple_cycle_number.append(current_point_number)
-                    # 最后加上初始点（为了删边）
+                    # Finally append the initial point (close cycle for subsequent edge removal)
                     # simple_cycle.append(initial_point)
                     # simple_cycle_number.append(initial_point_number)
-                    # 检索simple_cycle_number，从剩下的边中删除所有pi<pi+1的边（包括本边）
+                    # Traverse simple_cycle_number and remove every edge (pi, pi+1) with pi < pi+1 (including the starting edge) from the remaining edge set
                     # print('------------------')
                     # print(simple_cycle)
                     # print(simple_cycle_number)
@@ -783,17 +781,17 @@ def get_cycle_basis_and_semantic_2(output_points, output_edges):
                                 d_rev[edge_number[1]], d_rev[edge_number[0]]) in output_edges_c_copy_for_traversing:
                                     output_edges_c_copy_for_traversing.remove(
                                         (d_rev[edge_number[1]], d_rev[edge_number[0]]))
-                    # 算面积时不需要闭环
+                    # No need to duplicate the first point when computing polygon area
                     simple_cycle.pop(-1)
                     simple_cycle_number.pop(-1)
-                    # 存起来（逆时针计算面积，如果面积为负则不加入，说明是最大的那个）
+                    # Store polygon (area computed CCW; if area < 0 skip since it indicates the largest outer reversed loop)
                     polygon_counterclockwise = [(int(p[0]), -int(p[1])) for p in simple_cycle]
                     polygon_counterclockwise.pop(-1)
                     # print('poly_area(polygon_counterclockwise)', poly_area(polygon_counterclockwise))
                     if poly_area(polygon_counterclockwise) > 0:
                         simple_cycles_c.append(simple_cycle)
                         simple_cycles_number_c.append(simple_cycle_number)
-                        # 公共最大语义（最大的那个圈就不用算了），得到该simple_cycle的语义并记录
+                        # Derive the semantic label for this simple cycle by majority vote (skip outermost reversed cycle)
                         semantic_result = {}
                         for semantic_label in range(0, 14):
                             semantic_result[semantic_label] = 0
@@ -804,15 +802,15 @@ def get_cycle_basis_and_semantic_2(output_points, output_edges):
                         del semantic_result[13]
 
                         # print(semantic_result)
-                        # 如果最高票相同则等概率随机选一个（注意13不算）
+                        # If top vote counts tie choose uniformly at random (label 13 excluded)
                         this_cycle_semantic = sorted(semantic_result.items(), key=lambda d: d[1], reverse=True)
                         # print(this_cycle_semantic)
                         this_cycle_result = None
                         if this_cycle_semantic[0][1] > this_cycle_semantic[1][1]:
-                            # 以唯一最高票为准
+                            # Unique highest vote wins directly
                             this_cycle_result = this_cycle_semantic[0][0]
                         else:
-                            # 找出所有最高票数并等概率随机抽一个
+                            # Collect all labels with max count and pick one uniformly at random
                             this_cycle_results = [i[0] for i in this_cycle_semantic if
                                                   i[1] == this_cycle_semantic[0][1]]
                             this_cycle_result = this_cycle_results[random.randint(0, len(this_cycle_results) - 1)]
@@ -832,13 +830,13 @@ def get_cycle_basis_and_semantic_2(output_points, output_edges):
 
 
 def get_cycle_basis_and_semantic_2_semansimplified(output_points, output_edges):
-    # 一个关于索引和输出点的字典
+    # Dictionary mapping each output point to its index
     d = {}
     for output_point_index, output_point in enumerate(output_points):
-        d[output_point] = output_point_index  # 这里无法处理重复点，不能去掉nms
+        d[output_point] = output_point_index  # Cannot handle duplicate points here; NMS must have removed them earlier
     d_rev = {}
     for output_point_index, output_point in enumerate(output_points):
-        d_rev[output_point_index] = output_point  # 这里无法处理重复点，不能去掉nms
+        d_rev[output_point_index] = output_point  # Cannot handle duplicate points here; NMS must have removed them earlier
     es = []
     for output_edge in output_edges:
         es.append((d[output_edge[0]], d[output_edge[1]]))
@@ -853,9 +851,9 @@ def get_cycle_basis_and_semantic_2_semansimplified(output_points, output_edges):
     simple_cycles = []
     simple_cycles_number = []
     simple_cycles_semantics = []
-    # print('断点1', simple_cycles)
+    # print('Breakpoint 1', simple_cycles)
     bridges = list(nx.bridges(G))
-    # 虚边怎么做呢：还是直接删掉，从边集中删掉，然后作为多个连通的预测处理即可
+    # Handle bridge (virtual) edges by removing them; remaining components are processed independently
     for b in bridges:
         if (d_rev[b[0]], d_rev[b[1]]) in output_edges:
             output_edges.remove((d_rev[b[0]], d_rev[b[1]]))
@@ -865,7 +863,7 @@ def get_cycle_basis_and_semantic_2_semansimplified(output_points, output_edges):
             output_edges.remove((d_rev[b[1]], d_rev[b[0]]))
             es.remove((b[1], b[0]))
             G.remove_edge(b[1], b[0])
-    # 断掉割边集以后，我们查看剩下的所有连通分量，此时只存在孤立点或圈，遍历剩下的所有圈
+    # After removing bridge edges, only isolated nodes or pure cycles remain; iterate through each cycle component
     connected_components = list(nx.connected_components(G))
 
 
@@ -877,24 +875,24 @@ def get_cycle_basis_and_semantic_2_semansimplified(output_points, output_edges):
             simple_cycles_number_c = []
             simple_cycle_semantics_c = []
             # print(c) # {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23}
-            # 获取对应的点边集
+            # Collect corresponding point and edge sets for this component
             output_points_c = [p for p in output_points if d[p] in c]
-            output_edges_c = [e for e in output_edges if d[e[0]] in c or d[e[1]] in c]  # 固定的边集，不会删除
-            output_edges_c_copy_for_traversing = copy.deepcopy(output_edges_c)  # 用于遍历以减少时间复杂度的边集，其中的边会删除
+            output_edges_c = [e for e in output_edges if d[e[0]] in c or d[e[1]] in c]  # Fixed edge set (not removed)
+            output_edges_c_copy_for_traversing = copy.deepcopy(output_edges_c)  # Working copy for traversal; edges removed to reduce time complexity
             # print(output_points_c)
             # print(output_edges_c)
 
-            # 求该连通分量所有逆时针simple cycles的方法
-            # 定义d中的编号为该连通分量中点的编号，
-            # 遍历无向边集output_edges_c：
-            # 对每条无向边，规定初始点为编号较小者，上一个点为初始点，当前点为编号较大者；
-            # 求当前点的所有邻边，及对应的出射角度
-            # 求上一个点入射到当前点的方向的反方向，对应的角度（最常见的极坐标系[0,2pi)）
-            # 求从这个角度开始逆时针旋转，碰到的最后一个当前点的邻边
-            # 将该邻边的另一端作为下一个点
-            # 当下一个点等于初始点时，得到形式类似[p0,p1,...,pn-1,p0]的cycle
-            # 检索cycle，从剩下的边中删除所有pi<pi+1的边（包括本边），遍历剩下的边
-            # 将上一个点设为当前点，当前点设为下一个点
+            # Method to enumerate all counter‑clockwise simple cycles in this component
+            # Use indices in mapping d as the local identifiers for points in this component
+            # Iterate through the undirected edge set output_edges_c:
+            # For each undirected edge: initial = smaller index endpoint; last = initial; current = larger index
+            # Collect all neighbor edges of current point and compute their outgoing angles
+            # Compute reverse (outgoing) direction from last_point to current_point; get its angle in [0, 2pi)
+            # From that reference angle rotate CCW to select the last encountered neighbor edge
+            # Take the opposite endpoint of that neighbor edge as next point
+            # When next_point equals the initial point we obtain a cycle of form [p0, p1, ..., p_{n-1}, p0]
+            # After recording the cycle remove every edge (pi, pi+1) with pi < pi+1 (including the starting edge) and continue
+            # Update last_point = current_point; current_point = next_point
 
             for edge_c in output_edges_c:
                 if edge_c not in output_edges_c_copy_for_traversing:
@@ -908,7 +906,7 @@ def get_cycle_basis_and_semantic_2_semansimplified(output_points, output_edges):
                         point2 = edge_c[1]
                         point1_number = d[point1]
                         point2_number = d[point2]
-                        # 初始点
+                        # Initial point
                         initial_point = None
                         initial_point_number = None
                         if point1_number < point2_number:
@@ -919,10 +917,10 @@ def get_cycle_basis_and_semantic_2_semansimplified(output_points, output_edges):
                             initial_point_number = point2_number
                         simple_cycle.append(initial_point)
                         simple_cycle_number.append(initial_point_number)
-                        # 上一个点
+                        # Previous point
                         last_point = initial_point
                         last_point_number = initial_point_number
-                        # 当前点
+                        # Current point
                         current_point = None
                         current_point_number = None
                         if point1_number < point2_number:
@@ -933,24 +931,24 @@ def get_cycle_basis_and_semantic_2_semansimplified(output_points, output_edges):
                             current_point_number = point1_number
                         simple_cycle.append(current_point)
                         simple_cycle_number.append(current_point_number)
-                        # 初始点的后一个点（用于判断while结束）
+                        # Successor of the initial point (used to determine while-loop termination)
                         next_initial_point = copy.deepcopy(current_point)
                         next_initial_point_number = copy.deepcopy(current_point_number)
-                        # 下一个点
+                        # Next point placeholder
                         next_point = None
                         next_point_number = None
-                        # 当下一个点等于初始点的后一个点时，结束
+                        # End when next_point equals the successor of the initial point
                         while_count = 0
                         while next_point != next_initial_point and while_count < 1000:
-                            # 求当前点的所有邻边
+                            # Collect all neighbor edges of the current point
                             relevant_edges = []
                             for edge in output_edges_c:
                                 if (edge[0] == current_point or edge[1] == current_point) and (not (edge[0] == current_point and edge[1] == current_point)):
                                     relevant_edges.append(edge)
-                            # 求当前点的所有邻边对应的出射角度
+                            # Compute outgoing angles for all neighbor edges of the current point
                             relevant_edges_degree = []
                             for relevant_edge in relevant_edges:
-                                # 出射向量
+                                # Outgoing vector
                                 vec = None
                                 if relevant_edge[0] == current_point:
                                     vec = (
@@ -960,10 +958,10 @@ def get_cycle_basis_and_semantic_2_semansimplified(output_points, output_edges):
                                     relevant_edge[0][0] - relevant_edge[1][0], relevant_edge[0][1] - relevant_edge[1][1])
                                 else:
                                     assert 0
-                                # 求出射角度
+                                # Compute outgoing angle
                                 vec_degree = x_axis_angle(vec)
                                 relevant_edges_degree.append(vec_degree)
-                            # 求上一个点入射到当前点的方向的反方向（出射方向）、对应出射角度
+                            # Compute reverse (outgoing) direction of (last_point -> current_point) and its angle
                             vec_from_current_point_to_last_point = None
                             vec_from_current_point_to_last_point_degree = None
                             for relevant_edge_ind, relevant_edge in enumerate(relevant_edges):
@@ -981,11 +979,11 @@ def get_cycle_basis_and_semantic_2_semansimplified(output_points, output_edges):
                                     relevant_edges_degree.remove(vec_from_current_point_to_last_point_degree)
                                 else:
                                     continue
-                            # 求从这个角度开始逆时针旋转，碰到的最后一个当前点的邻边
-                            # 同时把没扫过部分（就是内角）的角度区域记录下来
-                            # 这里我们的内角语义替换为完全语义
+                            # From this angle rotate counter‑clockwise to the last neighbor edge of the current point
+                            # Also record the unswept portion (the interior angle interval)
+                            # Replace interior‑angle semantics with full semantics
                             rotate_deltas_counterclockwise = []
-                            # 记录内角区域，逆时针，从前一个角度到后一个角度
+                            # Record interior angle region: counter‑clockwise from previous angle to next angle
                             interior_angles = []
                             for relevant_edge_degree in relevant_edges_degree:
                                 rotate_delta = rotate_degree_counterclockwise_from_counter_degree(
@@ -993,23 +991,23 @@ def get_cycle_basis_and_semantic_2_semansimplified(output_points, output_edges):
                                 rotate_deltas_counterclockwise.append(rotate_delta)
                                 interior_angles.append((relevant_edge_degree, vec_from_current_point_to_last_point_degree))
                             # print(rotate_deltas_counterclockwise)
-                            # 最大角对应索引
+                            # Index of the maximum rotation angle
                             max_rotate_index = rotate_deltas_counterclockwise.index(max(rotate_deltas_counterclockwise))
-                            # 找到对应的内角
+                            # Corresponding interior angle
                             interior_angle_counterclockwise = interior_angles[max_rotate_index]
-                            # 求出对应的语义区域
-                            # 先求出当前点的所有语义，顺序按照四个象限排序
+                            # Derive the corresponding semantic region
+                            # Gather all semantics of the current point ordered by the four quadrants
                             # current_point_semantic = [current_point[3], current_point[2], current_point[5],
                             #                           current_point[4], ]
                             current_point_semantic = [current_point[3], current_point[2], current_point[5],
                                                       current_point[4], current_point[6], current_point[7],
                                                       current_point[8]]
-                            # 求出该逆时针角占了四个象限的多少角度
-                            # 求法：直接求度数较小的逆时针转到度数较大的覆盖四象限角度
-                            # 然后判断，如果度数较小的是内角区域的“源方向”，则正好是覆盖四象限角度；
-                            # 如果度数较小的是内角区域的“目标方向”，则对覆盖四象限角度用90度减去；
-                            interior_angle_counterclockwise_degree_smaller = min(interior_angle_counterclockwise)  # 度数较小的
-                            interior_angle_counterclockwise_degree_bigger = max(interior_angle_counterclockwise)  # 度数较大的
+                            # Determine how much of the four quadrants this counter‑clockwise angle spans
+                            # Method: rotate CCW from the smaller degree value to the larger to obtain quadrant coverage
+                            # Then check: if the smaller degree corresponds to the interior angle's source direction, the quadrant coverage stands as is;
+                            # If the smaller degree is the interior angle's target direction, subtract the span from 90°
+                            interior_angle_counterclockwise_degree_smaller = min(interior_angle_counterclockwise)  # smaller degree value
+                            interior_angle_counterclockwise_degree_bigger = max(interior_angle_counterclockwise)  # larger degree value
                             quadrant_smaller_to_bigger_counterclockwise = get_quadrant(
                                 (interior_angle_counterclockwise_degree_smaller,
                                  interior_angle_counterclockwise_degree_bigger))
@@ -1024,19 +1022,19 @@ def get_cycle_basis_and_semantic_2_semansimplified(output_points, output_edges):
                                 90 - quadrant_smaller_to_bigger_counterclockwise[3])
                             else:
                                 assert 0
-                            # 永远不将语义置为-1
+                            # Never set the semantic value to -1
                             current_point_semantic_valid = []
                             for qd, seman in enumerate(current_point_semantic):
                                 if 1:
                                     current_point_semantic_valid.append(seman)
                                 else:
                                     current_point_semantic_valid.append(-1)
-                            # 对全部语义进行统计
+                            # Tally all semantic values
                             simple_cycle_semantics.append(current_point_semantic_valid)
 
-                            # 对应边
+                            # Corresponding edge
                             max_rotate_edge = relevant_edges[max_rotate_index]
-                            # 对应下一个点
+                            # Corresponding next point
                             if max_rotate_edge[0] == current_point:
                                 next_point = max_rotate_edge[1]
                                 next_point_number = d[next_point]
@@ -1045,7 +1043,7 @@ def get_cycle_basis_and_semantic_2_semansimplified(output_points, output_edges):
                                 next_point_number = d[next_point]
                             else:
                                 assert 0
-                            # 重新给上一个点、当前点、下一个点赋值，并将当前点加入simple_cycle
+                            # Reassign last/current/next points and append current point to simple_cycle
                             last_point = current_point
                             last_point_number = current_point_number
                             current_point = next_point
@@ -1055,10 +1053,10 @@ def get_cycle_basis_and_semantic_2_semansimplified(output_points, output_edges):
                             while_count += 1
                         if len(simple_cycle) > 800:
                             continue
-                        # 最后加上初始点（为了删边）
+                        # Finally append the initial point (for subsequent edge removal)
                         # simple_cycle.append(initial_point)
                         # simple_cycle_number.append(initial_point_number)
-                        # 检索simple_cycle_number，从剩下的边中删除所有pi<pi+1的边（包括本边）
+                        # Traverse simple_cycle_number and delete from the remaining set every edge (pi, pi+1) with pi < pi+1 (including the starting edge)
                         # print('------------------')
                         # print(simple_cycle)
                         # print(simple_cycle_number)
@@ -1075,17 +1073,17 @@ def get_cycle_basis_and_semantic_2_semansimplified(output_points, output_edges):
                                     d_rev[edge_number[1]], d_rev[edge_number[0]]) in output_edges_c_copy_for_traversing:
                                         output_edges_c_copy_for_traversing.remove(
                                             (d_rev[edge_number[1]], d_rev[edge_number[0]]))
-                        # 算面积时不需要闭环
+                        # No need to explicitly close the loop when computing area
                         simple_cycle.pop(-1)
                         simple_cycle_number.pop(-1)
-                        # 存起来（逆时针计算面积，如果面积为负则不加入，说明是最大的那个）
+                        # Store cycle: compute area assuming CCW; if area is negative skip (indicates the outer largest face)
                         polygon_counterclockwise = [(int(p[0]), -int(p[1])) for p in simple_cycle]
                         polygon_counterclockwise.pop(-1)
                         # print('poly_area(polygon_counterclockwise)', poly_area(polygon_counterclockwise))
                         if poly_area(polygon_counterclockwise) > 0:
                             simple_cycles_c.append(simple_cycle)
                             simple_cycles_number_c.append(simple_cycle_number)
-                            # 公共最大语义（最大的那个圈就不用算了），得到该simple_cycle的语义并记录
+                            # Compute majority (common) semantics excluding the largest outer cycle; assign and record semantics for this simple_cycle
                             semantic_result = {}
                             for semantic_label in range(0, 7):
                                 semantic_result[semantic_label] = 0
@@ -1096,15 +1094,15 @@ def get_cycle_basis_and_semantic_2_semansimplified(output_points, output_edges):
                             del semantic_result[6]
 
                             # print(semantic_result)
-                            # 如果最高票相同则等概率随机选一个（注意13不算）
+                            # If the highest vote count ties, pick one uniformly at random (ignoring label 13)
                             this_cycle_semantic = sorted(semantic_result.items(), key=lambda d: d[1], reverse=True)
                             # print(this_cycle_semantic)
                             this_cycle_result = None
                             if this_cycle_semantic[0][1] > this_cycle_semantic[1][1]:
-                                # 以唯一最高票为准
+                                # Adopt the uniquely highest vote
                                 this_cycle_result = this_cycle_semantic[0][0]
                             else:
-                                # 找出所有最高票数并等概率随机抽一个
+                                # Find all labels with the max vote and select one uniformly at random
                                 this_cycle_results = [i[0] for i in this_cycle_semantic if
                                                       i[1] == this_cycle_semantic[0][1]]
                                 this_cycle_result = this_cycle_results[random.randint(0, len(this_cycle_results) - 1)]
@@ -1125,13 +1123,13 @@ def get_cycle_basis_and_semantic_2_semansimplified(output_points, output_edges):
     return d_rev, simple_cycles, simple_cycles_semantics
 
 def get_cycle_basis_and_semantic_3_semansimplified(output_points, output_edges):
-    # 一个关于索引和输出点的字典
+    # Dictionary relating indices to output points
     d = {}
     for output_point_index, output_point in enumerate(output_points):
-        d[output_point] = output_point_index  # 这里无法处理重复点，不能去掉nms
+        d[output_point] = output_point_index  # Cannot handle duplicate points here; do not remove prior NMS
     d_rev = {}
     for output_point_index, output_point in enumerate(output_points):
-        d_rev[output_point_index] = output_point  # 这里无法处理重复点，不能去掉nms
+        d_rev[output_point_index] = output_point  # Cannot handle duplicate points here; do not remove prior NMS
     es = []
     for output_edge in output_edges:
         es.append((d[output_edge[0]], d[output_edge[1]]))
@@ -1146,9 +1144,9 @@ def get_cycle_basis_and_semantic_3_semansimplified(output_points, output_edges):
     simple_cycles = []
     simple_cycles_number = []
     simple_cycles_semantics = []
-    # print('断点1', simple_cycles)
+    # print('Breakpoint 1', simple_cycles)
     bridges = list(nx.bridges(G))
-    # 虚边怎么做呢：还是直接删掉，从边集中删掉，然后作为多个连通的预测处理即可
+    # Handling virtual edges: simply remove them from the edge set and treat the result as multiple connected components
     for b in bridges:
         if (d_rev[b[0]], d_rev[b[1]]) in output_edges:
             output_edges.remove((d_rev[b[0]], d_rev[b[1]]))
@@ -1160,7 +1158,7 @@ def get_cycle_basis_and_semantic_3_semansimplified(output_points, output_edges):
             es.remove((b[1], b[0]))
             if G.has_edge(b[1], b[0]):
                 G.remove_edge(b[1], b[0])
-    # 断掉割边集以后，我们查看剩下的所有连通分量，此时只存在孤立点或圈，遍历剩下的所有圈
+    # After removing the bridge edge set, only isolated nodes or pure cycles remain; iterate all remaining cycles
     connected_components = list(nx.connected_components(G))
 
 
@@ -1172,24 +1170,24 @@ def get_cycle_basis_and_semantic_3_semansimplified(output_points, output_edges):
             simple_cycles_number_c = []
             simple_cycle_semantics_c = []
             # print(c) # {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23}
-            # 获取对应的点边集
+            # Collect point/edge subsets for this component
             output_points_c = [p for p in output_points if d[p] in c]
-            output_edges_c = [e for e in output_edges if d[e[0]] in c or d[e[1]] in c]  # 固定的边集，不会删除
-            output_edges_c_copy_for_traversing = copy.deepcopy(output_edges_c)  # 用于遍历以减少时间复杂度的边集，其中的边会删除
+            output_edges_c = [e for e in output_edges if d[e[0]] in c or d[e[1]] in c]  # Fixed edge set (not removed)
+            output_edges_c_copy_for_traversing = copy.deepcopy(output_edges_c)  # Working copy for traversal; edges removed to reduce time complexity
             # print(output_points_c)
             # print(output_edges_c)
 
-            # 求该连通分量所有逆时针simple cycles的方法
-            # 定义d中的编号为该连通分量中点的编号，
-            # 遍历无向边集output_edges_c：
-            # 对每条无向边，规定初始点为编号较小者，上一个点为初始点，当前点为编号较大者；
-            # 求当前点的所有邻边，及对应的出射角度
-            # 求上一个点入射到当前点的方向的反方向，对应的角度（最常见的极坐标系[0,2pi)）
-            # 求从这个角度开始逆时针旋转，碰到的最后一个当前点的邻边
-            # 将该邻边的另一端作为下一个点
-            # 当下一个点等于初始点时，得到形式类似[p0,p1,...,pn-1,p0]的cycle
-            # 检索cycle，从剩下的边中删除所有pi<pi+1的边（包括本边），遍历剩下的边
-            # 将上一个点设为当前点，当前点设为下一个点
+            # Method to enumerate all counter‑clockwise simple cycles in this component
+            # Use indices in mapping d as the local identifiers for points in this component
+            # Iterate through the undirected edge set output_edges_c:
+            # For each undirected edge: initial = smaller index endpoint; last = initial; current = larger index
+            # Compute all neighbor edges of the current point and their outgoing angles
+            # Compute the reverse direction of (last -> current) (standard polar angle in [0, 2π))
+            # From that reference angle rotate CCW to the last encountered neighbor edge
+            # Use that edge's other endpoint as the next point
+            # When next == initial we obtain a cycle like [p0,p1,...,pn-1,p0]
+            # Scan the cycle and remove from remaining edges every edge with pi < p(i+1)
+            # Update last/current pointers (last <- current, current <- next)
 
             for edge_c in output_edges_c:
                 if edge_c not in output_edges_c_copy_for_traversing:
@@ -1203,7 +1201,7 @@ def get_cycle_basis_and_semantic_3_semansimplified(output_points, output_edges):
                         point2 = edge_c[1]
                         point1_number = d[point1]
                         point2_number = d[point2]
-                        # 初始点
+                        # Initial point
                         initial_point = None
                         initial_point_number = None
                         if point1_number < point2_number:
@@ -1214,10 +1212,10 @@ def get_cycle_basis_and_semantic_3_semansimplified(output_points, output_edges):
                             initial_point_number = point2_number
                         simple_cycle.append(initial_point)
                         simple_cycle_number.append(initial_point_number)
-                        # 上一个点
+                        # Previous point
                         last_point = initial_point
                         last_point_number = initial_point_number
-                        # 当前点
+                        # Current point
                         current_point = None
                         current_point_number = None
                         if point1_number < point2_number:
@@ -1228,24 +1226,24 @@ def get_cycle_basis_and_semantic_3_semansimplified(output_points, output_edges):
                             current_point_number = point1_number
                         simple_cycle.append(current_point)
                         simple_cycle_number.append(current_point_number)
-                        # 初始点的后一个点（用于判断while结束）
+                        # Point right after the initial point (loop termination sentinel)
                         next_initial_point = copy.deepcopy(current_point)
                         next_initial_point_number = copy.deepcopy(current_point_number)
-                        # 下一个点
+                        # Placeholder for next point
                         next_point = None
                         next_point_number = None
-                        # 当下一个点等于初始点的后一个点时，结束
+                        # Stop when next point equals the post‑initial sentinel (or safety count exceeded)
                         while_count = 0
                         while next_point != next_initial_point and while_count < 100:
-                            # 求当前点的所有邻边
+                            # Collect all neighbor edges of current point
                             relevant_edges = []
                             for edge in output_edges_c:
                                 if (edge[0] == current_point or edge[1] == current_point) and (not (edge[0] == current_point and edge[1] == current_point)):
                                     relevant_edges.append(edge)
-                            # 求当前点的所有邻边对应的出射角度
+                            # Compute outgoing angle for each neighbor edge
                             relevant_edges_degree = []
                             for relevant_edge in relevant_edges:
-                                # 出射向量
+                                # Outgoing vector
                                 vec = None
                                 if relevant_edge[0] == current_point:
                                     vec = (
@@ -1255,10 +1253,10 @@ def get_cycle_basis_and_semantic_3_semansimplified(output_points, output_edges):
                                     relevant_edge[0][0] - relevant_edge[1][0], relevant_edge[0][1] - relevant_edge[1][1])
                                 else:
                                     assert 0
-                                # 求出射角度
+                                # Outgoing angle
                                 vec_degree = x_axis_angle(vec)
                                 relevant_edges_degree.append(vec_degree)
-                            # 求上一个点入射到当前点的方向的反方向（出射方向）、对应出射角度
+                            # Reverse (outgoing) direction of incoming edge last_point -> current_point
                             vec_from_current_point_to_last_point = None
                             vec_from_current_point_to_last_point_degree = None
                             for relevant_edge_ind, relevant_edge in enumerate(relevant_edges):
@@ -1276,11 +1274,11 @@ def get_cycle_basis_and_semantic_3_semansimplified(output_points, output_edges):
                                     relevant_edges_degree.remove(vec_from_current_point_to_last_point_degree)
                                 else:
                                     continue
-                            # 求从这个角度开始逆时针旋转，碰到的最后一个当前点的邻边
-                            # 同时把没扫过部分（就是内角）的角度区域记录下来
-                            # 这里我们的内角语义替换为完全语义
+                            # Rotate CCW from this angle to the last encountered neighbor edge
+                            # Record the remaining (unscanned) angular interval = interior angle
+                            # We treat interior semantics as the full semantic signal here
                             rotate_deltas_counterclockwise = []
-                            # 记录内角区域，逆时针，从前一个角度到后一个角度
+                            # Record interior angle region (CCW: previous direction -> neighbor direction)
                             interior_angles = []
                             for relevant_edge_degree in relevant_edges_degree:
                                 rotate_delta = rotate_degree_counterclockwise_from_counter_degree(
@@ -1288,23 +1286,22 @@ def get_cycle_basis_and_semantic_3_semansimplified(output_points, output_edges):
                                 rotate_deltas_counterclockwise.append(rotate_delta)
                                 interior_angles.append((relevant_edge_degree, vec_from_current_point_to_last_point_degree))
                             # print(rotate_deltas_counterclockwise)
-                            # 最大角对应索引
+                            # Index of maximal rotation
                             max_rotate_index = rotate_deltas_counterclockwise.index(max(rotate_deltas_counterclockwise))
-                            # 找到对应的内角
+                            # Retrieve the corresponding interior angle pair
                             interior_angle_counterclockwise = interior_angles[max_rotate_index]
-                            # 求出对应的语义区域
-                            # 先求出当前点的所有语义，顺序按照四个象限排序
+                            # Derive semantic region
+                            # Gather current point semantics ordered by quadrants
                             # current_point_semantic = [current_point[3], current_point[2], current_point[5],
                             #                           current_point[4], ]
                             current_point_semantic = [current_point[3], current_point[2], current_point[5],
                                                       current_point[4], current_point[6], current_point[7],
                                                       current_point[8]]
-                            # 求出该逆时针角占了四个象限的多少角度
-                            # 求法：直接求度数较小的逆时针转到度数较大的覆盖四象限角度
-                            # 然后判断，如果度数较小的是内角区域的“源方向”，则正好是覆盖四象限角度；
-                            # 如果度数较小的是内角区域的“目标方向”，则对覆盖四象限角度用90度减去；
-                            interior_angle_counterclockwise_degree_smaller = min(interior_angle_counterclockwise)  # 度数较小的
-                            interior_angle_counterclockwise_degree_bigger = max(interior_angle_counterclockwise)  # 度数较大的
+                            # Compute quadrant coverage of the CCW interior angle:
+                            # rotate from smaller degree to larger; if smaller is the source keep as is;
+                            # if smaller is the target subtract coverage from 90°.
+                            interior_angle_counterclockwise_degree_smaller = min(interior_angle_counterclockwise)  # smaller degree
+                            interior_angle_counterclockwise_degree_bigger = max(interior_angle_counterclockwise)  # larger degree
                             quadrant_smaller_to_bigger_counterclockwise = get_quadrant(
                                 (interior_angle_counterclockwise_degree_smaller,
                                  interior_angle_counterclockwise_degree_bigger))
@@ -1319,19 +1316,19 @@ def get_cycle_basis_and_semantic_3_semansimplified(output_points, output_edges):
                                 90 - quadrant_smaller_to_bigger_counterclockwise[3])
                             else:
                                 assert 0
-                            # 永远不将语义置为-1
+                            # Never set semantic to -1
                             current_point_semantic_valid = []
                             for qd, seman in enumerate(current_point_semantic):
                                 if 1:
                                     current_point_semantic_valid.append(seman)
                                 else:
                                     current_point_semantic_valid.append(-1)
-                            # 对全部语义进行统计
+                            # Accumulate semantics for this vertex
                             simple_cycle_semantics.append(current_point_semantic_valid)
 
-                            # 对应边
+                            # Edge chosen by maximal rotation
                             max_rotate_edge = relevant_edges[max_rotate_index]
-                            # 对应下一个点
+                            # Determine next point
                             if max_rotate_edge[0] == current_point:
                                 next_point = max_rotate_edge[1]
                                 next_point_number = d[next_point]
@@ -1340,7 +1337,7 @@ def get_cycle_basis_and_semantic_3_semansimplified(output_points, output_edges):
                                 next_point_number = d[next_point]
                             else:
                                 assert 0
-                            # 重新给上一个点、当前点、下一个点赋值，并将当前点加入simple_cycle
+                            # Reassign (last,current,next) and append current to cycle
                             last_point = current_point
                             last_point_number = current_point_number
                             current_point = next_point
@@ -1350,10 +1347,10 @@ def get_cycle_basis_and_semantic_3_semansimplified(output_points, output_edges):
                             while_count += 1
                         if len(simple_cycle) > 80:
                             continue
-                        # 最后加上初始点（为了删边）
+                        # (Optional) append initial point again (edge removal bookkeeping)
                         # simple_cycle.append(initial_point)
                         # simple_cycle_number.append(initial_point_number)
-                        # 检索simple_cycle_number，从剩下的边中删除所有pi<pi+1的边（包括本边）
+                        # Remove every edge with index ordering pi < p(i+1) from traversal set
                         # print('------------------')
                         # print(simple_cycle)
                         # print(simple_cycle_number)
@@ -1370,17 +1367,17 @@ def get_cycle_basis_and_semantic_3_semansimplified(output_points, output_edges):
                                     d_rev[edge_number[1]], d_rev[edge_number[0]]) in output_edges_c_copy_for_traversing:
                                         output_edges_c_copy_for_traversing.remove(
                                             (d_rev[edge_number[1]], d_rev[edge_number[0]]))
-                        # 算面积时不需要闭环
+                        # No need to explicitly close cycle for area calculation
                         simple_cycle.pop(-1)
                         simple_cycle_number.pop(-1)
-                        # 存起来（逆时针计算面积，如果面积为负则不加入，说明是最大的那个）
+                        # Keep if CCW area positive (negative implies outermost boundary)
                         polygon_counterclockwise = [(int(p[0]), -int(p[1])) for p in simple_cycle]
                         polygon_counterclockwise.pop(-1)
                         # print('poly_area(polygon_counterclockwise)', poly_area(polygon_counterclockwise))
                         if poly_area(polygon_counterclockwise) > 0:
                             simple_cycles_c.append(simple_cycle)
                             simple_cycles_number_c.append(simple_cycle_number)
-                            # 公共最大语义（最大的那个圈就不用算了），得到该simple_cycle的语义并记录
+                            # Majority semantic (outermost skipped) – tally and record
                             semantic_result = {}
                             for semantic_label in range(0, 7):
                                 semantic_result[semantic_label] = 0
@@ -1391,14 +1388,14 @@ def get_cycle_basis_and_semantic_3_semansimplified(output_points, output_edges):
                             del semantic_result[6]
 
                             # print(semantic_result)
-                            # 如果最高票相同则等概率随机选一个（注意13不算）
+                            # If top vote count ties choose randomly (label 13 excluded)
                             this_cycle_semantic = sorted(semantic_result.items(), key=lambda d: d[1], reverse=True)
                             # print(this_cycle_semantic)
                             if this_cycle_semantic[0][1] > this_cycle_semantic[1][1]:
-                                # 以唯一最高票为准
+                                # Unique top vote wins
                                 this_cycle_result = this_cycle_semantic[0][0]
                             else:
-                                # 找出所有最高票数，按照橱柜2，浴室4，厨房3，卧室1，阳台5，客厅0的优先级确定
+                                # Tie resolution priority: cabinet(2) > bathroom(4) > kitchen(3) > bedroom(1) > balcony(5) > livingroom(0)
                                 this_cycle_results = [i[0] for i in this_cycle_semantic if
                                                       i[1] == this_cycle_semantic[0][1]]
                                 if 2 in this_cycle_results:
@@ -1430,13 +1427,13 @@ def get_cycle_basis_and_semantic_3_semansimplified(output_points, output_edges):
     return d_rev, simple_cycles, simple_cycles_semantics
 
 def get_cycle_basis_and_semantic_3_semansimplified_lifull(output_points, output_edges):
-    # 一个关于索引和输出点的字典
+    # Dictionary mapping output points to indices
     d = {}
     for output_point_index, output_point in enumerate(output_points):
-        d[output_point] = output_point_index  # 这里无法处理重复点，不能去掉nms
+        d[output_point] = output_point_index  # Cannot handle duplicate points here; NMS cannot be removed
     d_rev = {}
     for output_point_index, output_point in enumerate(output_points):
-        d_rev[output_point_index] = output_point  # 这里无法处理重复点，不能去掉nms
+        d_rev[output_point_index] = output_point  # Cannot handle duplicate points here; NMS cannot be removed
     es = []
     for output_edge in output_edges:
         es.append((d[output_edge[0]], d[output_edge[1]]))
@@ -1451,9 +1448,9 @@ def get_cycle_basis_and_semantic_3_semansimplified_lifull(output_points, output_
     simple_cycles = []
     simple_cycles_number = []
     simple_cycles_semantics = []
-    # print('断点1', simple_cycles)
+    # print('breakpoint1', simple_cycles)
     bridges = list(nx.bridges(G))
-    # 虚边怎么做呢：还是直接删掉，从边集中删掉，然后作为多个连通的预测处理即可
+    # Handling virtual edges: remove them from the edge set and treat each resulting connected prediction independently
     for b in bridges:
         if (d_rev[b[0]], d_rev[b[1]]) in output_edges:
             output_edges.remove((d_rev[b[0]], d_rev[b[1]]))
@@ -1465,7 +1462,7 @@ def get_cycle_basis_and_semantic_3_semansimplified_lifull(output_points, output_
             es.remove((b[1], b[0]))
             if G.has_edge(b[1], b[0]):
                 G.remove_edge(b[1], b[0])
-    # 断掉割边集以后，我们查看剩下的所有连通分量，此时只存在孤立点或圈，遍历剩下的所有圈
+    # After removing bridges inspect remaining connected components (only isolated nodes or pure cycles) and traverse all cycles
     connected_components = list(nx.connected_components(G))
 
 
@@ -1476,10 +1473,10 @@ def get_cycle_basis_and_semantic_3_semansimplified_lifull(output_points, output_
             simple_cycles_c = []
             simple_cycles_number_c = []
             simple_cycle_semantics_c = []
-            # 获取对应的点边集
+            # Collect corresponding point/edge subset for this component
             output_points_c = [p for p in output_points if d[p] in c]
-            output_edges_c = [e for e in output_edges if d[e[0]] in c or d[e[1]] in c]  # 固定的边集，不会删除
-            output_edges_c_copy_for_traversing = copy.deepcopy(output_edges_c)  # 用于遍历以减少时间复杂度的边集，其中的边会删除
+            output_edges_c = [e for e in output_edges if d[e[0]] in c or d[e[1]] in c]  # Fixed edge set (not removed)
+            output_edges_c_copy_for_traversing = copy.deepcopy(output_edges_c)  # Working traversal edge set; edges removed to reduce complexity
 
 
             for edge_c in output_edges_c:
@@ -1494,7 +1491,7 @@ def get_cycle_basis_and_semantic_3_semansimplified_lifull(output_points, output_
                         point2 = edge_c[1]
                         point1_number = d[point1]
                         point2_number = d[point2]
-                        # 初始点
+                        # Initial point
                         initial_point = None
                         initial_point_number = None
                         if point1_number < point2_number:
@@ -1505,10 +1502,10 @@ def get_cycle_basis_and_semantic_3_semansimplified_lifull(output_points, output_
                             initial_point_number = point2_number
                         simple_cycle.append(initial_point)
                         simple_cycle_number.append(initial_point_number)
-                        # 上一个点
+                        # Previous point
                         last_point = initial_point
                         last_point_number = initial_point_number
-                        # 当前点
+                        # Current point
                         current_point = None
                         current_point_number = None
                         if point1_number < point2_number:
@@ -1519,24 +1516,24 @@ def get_cycle_basis_and_semantic_3_semansimplified_lifull(output_points, output_
                             current_point_number = point1_number
                         simple_cycle.append(current_point)
                         simple_cycle_number.append(current_point_number)
-                        # 初始点的后一个点（用于判断while结束）
+                        # Point immediately after the initial point (termination sentinel)
                         next_initial_point = copy.deepcopy(current_point)
                         next_initial_point_number = copy.deepcopy(current_point_number)
-                        # 下一个点
+                        # Next point placeholder
                         next_point = None
                         next_point_number = None
-                        # 当下一个点等于初始点的后一个点时，结束
+                        # Stop when next point equals the post‑initial sentinel or safety limit reached
                         while_count = 0
                         while next_point != next_initial_point and while_count < 100:
-                            # 求当前点的所有邻边
+                            # Collect all neighbor edges of current point
                             relevant_edges = []
                             for edge in output_edges_c:
                                 if (edge[0] == current_point or edge[1] == current_point) and (not (edge[0] == current_point and edge[1] == current_point)):
                                     relevant_edges.append(edge)
-                            # 求当前点的所有邻边对应的出射角度
+                            # Compute outgoing angles of neighbor edges
                             relevant_edges_degree = []
                             for relevant_edge in relevant_edges:
-                                # 出射向量
+                                # Outgoing vector
                                 vec = None
                                 if relevant_edge[0] == current_point:
                                     vec = (
@@ -1546,10 +1543,10 @@ def get_cycle_basis_and_semantic_3_semansimplified_lifull(output_points, output_
                                     relevant_edge[0][0] - relevant_edge[1][0], relevant_edge[0][1] - relevant_edge[1][1])
                                 else:
                                     assert 0
-                                # 求出射角度
+                                # Outgoing angle
                                 vec_degree = x_axis_angle(vec)
                                 relevant_edges_degree.append(vec_degree)
-                            # 求上一个点入射到当前点的方向的反方向（出射方向）、对应出射角度
+                            # Reverse (outgoing) direction of incoming edge last_point -> current_point and its angle
                             vec_from_current_point_to_last_point = None
                             vec_from_current_point_to_last_point_degree = None
                             for relevant_edge_ind, relevant_edge in enumerate(relevant_edges):
@@ -1567,11 +1564,11 @@ def get_cycle_basis_and_semantic_3_semansimplified_lifull(output_points, output_
                                     relevant_edges_degree.remove(vec_from_current_point_to_last_point_degree)
                                 else:
                                     continue
-                            # 求从这个角度开始逆时针旋转，碰到的最后一个当前点的邻边
-                            # 同时把没扫过部分（就是内角）的角度区域记录下来
-                            # 这里我们的内角语义替换为完全语义
+                            # Rotate CCW from this angle until the last (max rotation) neighbor edge is reached
+                            # Also record the unscanned portion (the interior angle interval)
+                            # Substitute interior-angle semantics with the full semantics
                             rotate_deltas_counterclockwise = []
-                            # 记录内角区域，逆时针，从前一个角度到后一个角度
+                            # Record interior angle interval: CCW from previous angle to neighbor angle
                             interior_angles = []
                             for relevant_edge_degree in relevant_edges_degree:
                                 rotate_delta = rotate_degree_counterclockwise_from_counter_degree(
@@ -1579,23 +1576,23 @@ def get_cycle_basis_and_semantic_3_semansimplified_lifull(output_points, output_
                                 rotate_deltas_counterclockwise.append(rotate_delta)
                                 interior_angles.append((relevant_edge_degree, vec_from_current_point_to_last_point_degree))
                             # print(rotate_deltas_counterclockwise)
-                            # 最大角对应索引
+                            # Index of maximal rotation
                             max_rotate_index = rotate_deltas_counterclockwise.index(max(rotate_deltas_counterclockwise))
-                            # 找到对应的内角
+                            # Corresponding interior angle
                             interior_angle_counterclockwise = interior_angles[max_rotate_index]
-                            # 求出对应的语义区域
-                            # 先求出当前点的所有语义，顺序按照四个象限排序
+                            # Derive corresponding semantic region
+                            # Gather all semantics of the current point ordered by quadrants
                             # current_point_semantic = [current_point[3], current_point[2], current_point[5],
                             #                           current_point[4], ]
                             current_point_semantic = [current_point[3], current_point[2], current_point[5],
                                                       current_point[4], current_point[6], current_point[7],
                                                       current_point[8], current_point[9], current_point[10], current_point[11], current_point[12], current_point[13], current_point[14]]
-                            # 求出该逆时针角占了四个象限的多少角度
-                            # 求法：直接求度数较小的逆时针转到度数较大的覆盖四象限角度
-                            # 然后判断，如果度数较小的是内角区域的“源方向”，则正好是覆盖四象限角度；
-                            # 如果度数较小的是内角区域的“目标方向”，则对覆盖四象限角度用90度减去；
-                            interior_angle_counterclockwise_degree_smaller = min(interior_angle_counterclockwise)  # 度数较小的
-                            interior_angle_counterclockwise_degree_bigger = max(interior_angle_counterclockwise)  # 度数较大的
+                            # Compute how much of each quadrant this CCW interior angle covers
+                            # Method: rotate CCW from the smaller degree to the larger to determine coverage
+                            # Then: if the smaller degree is the 'source' direction use coverage directly;
+                            # if it is the 'target' direction subtract coverage from 90°.
+                            interior_angle_counterclockwise_degree_smaller = min(interior_angle_counterclockwise)  # smaller degree
+                            interior_angle_counterclockwise_degree_bigger = max(interior_angle_counterclockwise)  # larger degree
                             quadrant_smaller_to_bigger_counterclockwise = get_quadrant(
                                 (interior_angle_counterclockwise_degree_smaller,
                                  interior_angle_counterclockwise_degree_bigger))
@@ -1610,19 +1607,19 @@ def get_cycle_basis_and_semantic_3_semansimplified_lifull(output_points, output_
                                 90 - quadrant_smaller_to_bigger_counterclockwise[3])
                             else:
                                 assert 0
-                            # 永远不将语义置为-1
+                            # Never set semantic to -1
                             current_point_semantic_valid = []
                             for qd, seman in enumerate(current_point_semantic):
                                 if 1:
                                     current_point_semantic_valid.append(seman)
                                 else:
                                     current_point_semantic_valid.append(-1)
-                            # 对全部语义进行统计
+                            # Accumulate all semantics
                             simple_cycle_semantics.append(current_point_semantic_valid)
 
-                            # 对应边
+                            # Chosen edge
                             max_rotate_edge = relevant_edges[max_rotate_index]
-                            # 对应下一个点
+                            # Next point
                             if max_rotate_edge[0] == current_point:
                                 next_point = max_rotate_edge[1]
                                 next_point_number = d[next_point]
@@ -1631,7 +1628,7 @@ def get_cycle_basis_and_semantic_3_semansimplified_lifull(output_points, output_
                                 next_point_number = d[next_point]
                             else:
                                 assert 0
-                            # 重新给上一个点、当前点、下一个点赋值，并将当前点加入simple_cycle
+                            # Reassign last/current/next and append current point to simple_cycle
                             last_point = current_point
                             last_point_number = current_point_number
                             current_point = next_point
@@ -1641,10 +1638,10 @@ def get_cycle_basis_and_semantic_3_semansimplified_lifull(output_points, output_
                             while_count += 1
                         if len(simple_cycle) > 80:
                             continue
-                        # 最后加上初始点（为了删边）
+                        # (Optional) append initial point again (for edge removal bookkeeping)
                         # simple_cycle.append(initial_point)
                         # simple_cycle_number.append(initial_point_number)
-                        # 检索simple_cycle_number，从剩下的边中删除所有pi<pi+1的边（包括本边）
+                        # Remove from remaining edge set all edges with pi < p(i+1) (including this one)
                         # print('------------------')
                         # print(simple_cycle)
                         # print(simple_cycle_number)
@@ -1661,17 +1658,17 @@ def get_cycle_basis_and_semantic_3_semansimplified_lifull(output_points, output_
                                     d_rev[edge_number[1]], d_rev[edge_number[0]]) in output_edges_c_copy_for_traversing:
                                         output_edges_c_copy_for_traversing.remove(
                                             (d_rev[edge_number[1]], d_rev[edge_number[0]]))
-                        # 算面积时不需要闭环
+                        # No explicit closure needed for area computation
                         simple_cycle.pop(-1)
                         simple_cycle_number.pop(-1)
-                        # 存起来（逆时针计算面积，如果面积为负则不加入，说明是最大的那个）
+                        # Keep if CCW area > 0 (negative => outer boundary)
                         polygon_counterclockwise = [(int(p[0]), -int(p[1])) for p in simple_cycle]
                         polygon_counterclockwise.pop(-1)
                         # print('poly_area(polygon_counterclockwise)', poly_area(polygon_counterclockwise))
                         if poly_area(polygon_counterclockwise) > 0:
                             simple_cycles_c.append(simple_cycle)
                             simple_cycles_number_c.append(simple_cycle_number)
-                            # 公共最大语义（最大的那个圈就不用算了），得到该simple_cycle的语义并记录
+                            # Majority semantic (largest outer cycle skipped) – compute and record label
                             semantic_result = {}
                             for semantic_label in range(0, 13):
                                 semantic_result[semantic_label] = 0
@@ -1683,14 +1680,14 @@ def get_cycle_basis_and_semantic_3_semansimplified_lifull(output_points, output_
                             del semantic_result[12]
 
                             # print(semantic_result)
-                            # 如果最高票相同则等概率随机选一个（注意13不算）
+                            # If top vote counts tie pick uniformly at random (label 13 ignored)
                             this_cycle_semantic = sorted(semantic_result.items(), key=lambda d: d[1], reverse=True)
                             # print(this_cycle_semantic)
                             if this_cycle_semantic[0][1] > this_cycle_semantic[1][1]:
-                                # 以唯一最高票为准
+                                # Unique top vote wins
                                 this_cycle_result = this_cycle_semantic[0][0]
                             else:
-                                # 找出所有最高票数，按照0 10 1 8 9 5 6 2 4 3 7的优先级确定，这个不好观察，直接简单按频率
+                                # For tied max votes apply priority: 0>10>1>8>9>5>6>2>4>3>7 (fallback = raw frequency)
                                 this_cycle_results = [i[0] for i in this_cycle_semantic if
                                                       i[1] == this_cycle_semantic[0][1]]
                                 if 0 in this_cycle_results:
@@ -1732,13 +1729,13 @@ def get_cycle_basis_and_semantic_3_semansimplified_lifull(output_points, output_
     return d_rev, simple_cycles, simple_cycles_semantics
 
 def get_cycle_basis_and_semantic_2_semansimplified_4extractingboundary(output_points, output_edges):
-    # 一个关于索引和输出点的字典
+    # Dictionary mapping output points to indices
     d = {}
     for output_point_index, output_point in enumerate(output_points):
-        d[output_point] = output_point_index  # 这里无法处理重复点，不能去掉nms
+        d[output_point] = output_point_index  # Cannot handle duplicate points here; NMS cannot be removed
     d_rev = {}
     for output_point_index, output_point in enumerate(output_points):
-        d_rev[output_point_index] = output_point  # 这里无法处理重复点，不能去掉nms
+        d_rev[output_point_index] = output_point  # Cannot handle duplicate points here; NMS cannot be removed
     es = []
     for output_edge in output_edges:
         es.append((d[output_edge[0]], d[output_edge[1]]))
@@ -1753,9 +1750,9 @@ def get_cycle_basis_and_semantic_2_semansimplified_4extractingboundary(output_po
     simple_cycles = []
     simple_cycles_number = []
     simple_cycles_semantics = []
-    # print('断点1', simple_cycles)
+    # print('breakpoint1', simple_cycles)
     bridges = list(nx.bridges(G))
-    # 虚边怎么做呢：还是直接删掉，从边集中删掉，然后作为多个连通的预测处理即可
+    # Handling virtual edges: remove them from edge set and treat each resulting connected component separately
     for b in bridges:
         if (d_rev[b[0]], d_rev[b[1]]) in output_edges:
             output_edges.remove((d_rev[b[0]], d_rev[b[1]]))
@@ -1765,7 +1762,7 @@ def get_cycle_basis_and_semantic_2_semansimplified_4extractingboundary(output_po
             output_edges.remove((d_rev[b[1]], d_rev[b[0]]))
             es.remove((b[1], b[0]))
             G.remove_edge(b[1], b[0])
-    # 断掉割边集以后，我们查看剩下的所有连通分量，此时只存在孤立点或圈，遍历剩下的所有圈
+    # After removing bridge edges inspect remaining connected components (only isolated nodes or cycles) and traverse cycles
     connected_components = list(nx.connected_components(G))
 
 
@@ -1777,24 +1774,24 @@ def get_cycle_basis_and_semantic_2_semansimplified_4extractingboundary(output_po
             simple_cycles_number_c = []
             simple_cycle_semantics_c = []
             # print(c) # {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23}
-            # 获取对应的点边集
+            # Collect corresponding point/edge subset
             output_points_c = [p for p in output_points if d[p] in c]
-            output_edges_c = [e for e in output_edges if d[e[0]] in c or d[e[1]] in c]  # 固定的边集，不会删除
-            output_edges_c_copy_for_traversing = copy.deepcopy(output_edges_c)  # 用于遍历以减少时间复杂度的边集，其中的边会删除
+            output_edges_c = [e for e in output_edges if d[e[0]] in c or d[e[1]] in c]  # Fixed edge set (not removed)
+            output_edges_c_copy_for_traversing = copy.deepcopy(output_edges_c)  # Traversal working edge set; edges removed to reduce complexity
             # print(output_points_c)
             # print(output_edges_c)
 
-            # 求该连通分量所有逆时针simple cycles的方法
-            # 定义d中的编号为该连通分量中点的编号，
-            # 遍历无向边集output_edges_c：
-            # 对每条无向边，规定初始点为编号较小者，上一个点为初始点，当前点为编号较大者；
-            # 求当前点的所有邻边，及对应的出射角度
-            # 求上一个点入射到当前点的方向的反方向，对应的角度（最常见的极坐标系[0,2pi)）
-            # 求从这个角度开始逆时针旋转，碰到的最后一个当前点的邻边
-            # 将该邻边的另一端作为下一个点
-            # 当下一个点等于初始点时，得到形式类似[p0,p1,...,pn-1,p0]的cycle
-            # 检索cycle，从剩下的边中删除所有pi<pi+1的边（包括本边），遍历剩下的边
-            # 将上一个点设为当前点，当前点设为下一个点
+            # Method to enumerate all CCW simple cycles in this component
+            # Treat indices in d as local point ids within the component
+            # Iterate over undirected edges in output_edges_c
+            # For each edge choose the smaller-index endpoint as initial; last_point starts there; current_point is the larger-index endpoint
+            # Collect all neighbor edges of the current point and compute their outgoing angles
+            # Compute the reverse (outgoing) direction of the edge from last_point into current_point (angle in standard polar [0, 2pi))
+            # From that angle rotate CCW and pick the last encountered neighbor edge (max CCW rotation)
+            # Use the opposite endpoint of that chosen edge as next_point
+            # When next_point equals the initial point we obtain a cycle of the form [p0, p1, ..., pn-1, p0]
+            # After identifying a cycle, remove all edges with pi < p(i+1) (including the current one) from the traversing set and continue
+            # Advance: last_point <- current_point, current_point <- next_point
 
             for edge_c in output_edges_c:
                 if edge_c not in output_edges_c_copy_for_traversing:
@@ -1808,7 +1805,7 @@ def get_cycle_basis_and_semantic_2_semansimplified_4extractingboundary(output_po
                         point2 = edge_c[1]
                         point1_number = d[point1]
                         point2_number = d[point2]
-                        # 初始点
+                        # Initial point
                         initial_point = None
                         initial_point_number = None
                         if point1_number < point2_number:
@@ -1819,10 +1816,10 @@ def get_cycle_basis_and_semantic_2_semansimplified_4extractingboundary(output_po
                             initial_point_number = point2_number
                         simple_cycle.append(initial_point)
                         simple_cycle_number.append(initial_point_number)
-                        # 上一个点
+                        # Previous point (last_point)
                         last_point = initial_point
                         last_point_number = initial_point_number
-                        # 当前点
+                        # Current point
                         current_point = None
                         current_point_number = None
                         if point1_number < point2_number:
@@ -1833,24 +1830,24 @@ def get_cycle_basis_and_semantic_2_semansimplified_4extractingboundary(output_po
                             current_point_number = point1_number
                         simple_cycle.append(current_point)
                         simple_cycle_number.append(current_point_number)
-                        # 初始点的后一个点（用于判断while结束）
+                        # The point after the initial point (to decide termination of while loop)
                         next_initial_point = copy.deepcopy(current_point)
                         next_initial_point_number = copy.deepcopy(current_point_number)
-                        # 下一个点
+                        # Next point placeholder
                         next_point = None
                         next_point_number = None
-                        # 当下一个点等于初始点的后一个点时，结束
+                        # Stop when next_point becomes the second vertex (next_initial_point)
                         while_count = 0
                         while next_point != next_initial_point and while_count < 1000:
-                            # 求当前点的所有邻边
+                            # Gather all neighbor edges of current_point
                             relevant_edges = []
                             for edge in output_edges_c:
                                 if (edge[0] == current_point or edge[1] == current_point) and (not (edge[0] == current_point and edge[1] == current_point)):
                                     relevant_edges.append(edge)
-                            # 求当前点的所有邻边对应的出射角度
+                            # Compute outgoing angles for each neighbor edge
                             relevant_edges_degree = []
                             for relevant_edge in relevant_edges:
-                                # 出射向量
+                                # Outgoing vector
                                 vec = None
                                 if relevant_edge[0] == current_point:
                                     vec = (
@@ -1860,10 +1857,10 @@ def get_cycle_basis_and_semantic_2_semansimplified_4extractingboundary(output_po
                                     relevant_edge[0][0] - relevant_edge[1][0], relevant_edge[0][1] - relevant_edge[1][1])
                                 else:
                                     assert 0
-                                # 求出射角度
+                                # Compute outgoing angle
                                 vec_degree = x_axis_angle(vec)
                                 relevant_edges_degree.append(vec_degree)
-                            # 求上一个点入射到当前点的方向的反方向（出射方向）、对应出射角度
+                            # Compute reverse direction (outgoing) from last_point->current_point and its angle
                             vec_from_current_point_to_last_point = None
                             vec_from_current_point_to_last_point_degree = None
                             for relevant_edge_ind, relevant_edge in enumerate(relevant_edges):
@@ -1881,11 +1878,11 @@ def get_cycle_basis_and_semantic_2_semansimplified_4extractingboundary(output_po
                                     relevant_edges_degree.remove(vec_from_current_point_to_last_point_degree)
                                 else:
                                     continue
-                            # 求从这个角度开始逆时针旋转，碰到的最后一个当前点的邻边
-                            # 同时把没扫过部分（就是内角）的角度区域记录下来
-                            # 这里我们的内角语义替换为完全语义
+                            # Rotate CCW from that angle to find the last neighbor edge (max rotation)
+                            # Record the untouched angular interval (the interior angle) along the way
+                            # Interior angle semantics replaced here with full semantics
                             rotate_deltas_counterclockwise = []
-                            # 记录内角区域，逆时针，从前一个角度到后一个角度
+                            # Record interior angle interval, CCW from previous angle to next angle
                             interior_angles = []
                             for relevant_edge_degree in relevant_edges_degree:
                                 rotate_delta = rotate_degree_counterclockwise_from_counter_degree(
@@ -1893,23 +1890,22 @@ def get_cycle_basis_and_semantic_2_semansimplified_4extractingboundary(output_po
                                 rotate_deltas_counterclockwise.append(rotate_delta)
                                 interior_angles.append((relevant_edge_degree, vec_from_current_point_to_last_point_degree))
                             # print(rotate_deltas_counterclockwise)
-                            # 最大角对应索引
+                            # Index of maximal rotation
                             max_rotate_index = rotate_deltas_counterclockwise.index(max(rotate_deltas_counterclockwise))
-                            # 找到对应的内角
+                            # Retrieve corresponding interior angle
                             interior_angle_counterclockwise = interior_angles[max_rotate_index]
-                            # 求出对应的语义区域
-                            # 先求出当前点的所有语义，顺序按照四个象限排序
+                            # Determine semantic region
+                            # Collect all semantics of current point ordered by quadrants
                             # current_point_semantic = [current_point[3], current_point[2], current_point[5],
                             #                           current_point[4], ]
                             current_point_semantic = [current_point[3], current_point[2], current_point[5],
                                                       current_point[4], current_point[6], current_point[7],
                                                       current_point[8]]
-                            # 求出该逆时针角占了四个象限的多少角度
-                            # 求法：直接求度数较小的逆时针转到度数较大的覆盖四象限角度
-                            # 然后判断，如果度数较小的是内角区域的“源方向”，则正好是覆盖四象限角度；
-                            # 如果度数较小的是内角区域的“目标方向”，则对覆盖四象限角度用90度减去；
-                            interior_angle_counterclockwise_degree_smaller = min(interior_angle_counterclockwise)  # 度数较小的
-                            interior_angle_counterclockwise_degree_bigger = max(interior_angle_counterclockwise)  # 度数较大的
+                            # Compute portion of quadrants covered by this CCW interior angle
+                            # Method: angle from smaller degree rotating CCW to larger degree covers quadrants
+                            # If smaller degree is the source direction keep coverage; if it's the target subtract from 90
+                            interior_angle_counterclockwise_degree_smaller = min(interior_angle_counterclockwise)  # smaller degree
+                            interior_angle_counterclockwise_degree_bigger = max(interior_angle_counterclockwise)  # larger degree
                             quadrant_smaller_to_bigger_counterclockwise = get_quadrant(
                                 (interior_angle_counterclockwise_degree_smaller,
                                  interior_angle_counterclockwise_degree_bigger))
@@ -1924,19 +1920,19 @@ def get_cycle_basis_and_semantic_2_semansimplified_4extractingboundary(output_po
                                 90 - quadrant_smaller_to_bigger_counterclockwise[3])
                             else:
                                 assert 0
-                            # 永远不将语义置为-1
+                            # Never assign semantic -1
                             current_point_semantic_valid = []
                             for qd, seman in enumerate(current_point_semantic):
                                 if 1:
                                     current_point_semantic_valid.append(seman)
                                 else:
                                     current_point_semantic_valid.append(-1)
-                            # 对全部语义进行统计
+                            # Accumulate semantics for this vertex
                             simple_cycle_semantics.append(current_point_semantic_valid)
 
-                            # 对应边
+                            # Edge chosen by maximal rotation
                             max_rotate_edge = relevant_edges[max_rotate_index]
-                            # 对应下一个点
+                            # Determine next point
                             if max_rotate_edge[0] == current_point:
                                 next_point = max_rotate_edge[1]
                                 next_point_number = d[next_point]
@@ -1945,7 +1941,7 @@ def get_cycle_basis_and_semantic_2_semansimplified_4extractingboundary(output_po
                                 next_point_number = d[next_point]
                             else:
                                 assert 0
-                            # 重新给上一个点、当前点、下一个点赋值，并将当前点加入simple_cycle
+                            # Update last/current pointers and append current_point to simple_cycle
                             last_point = current_point
                             last_point_number = current_point_number
                             current_point = next_point
@@ -1955,10 +1951,10 @@ def get_cycle_basis_and_semantic_2_semansimplified_4extractingboundary(output_po
                             while_count += 1
                         if len(simple_cycle) > 800:
                             continue
-                        # 最后加上初始点（为了删边）
+                        # (Optionally) append initial point for edge deletion (unused here)
                         # simple_cycle.append(initial_point)
                         # simple_cycle_number.append(initial_point_number)
-                        # 检索simple_cycle_number，从剩下的边中删除所有pi<pi+1的边（包括本边）
+                        # Remove all edges with pi < p(i+1) from traversing set
                         # print('------------------')
                         # print(simple_cycle)
                         # print(simple_cycle_number)
@@ -1975,10 +1971,10 @@ def get_cycle_basis_and_semantic_2_semansimplified_4extractingboundary(output_po
                                     d_rev[edge_number[1]], d_rev[edge_number[0]]) in output_edges_c_copy_for_traversing:
                                         output_edges_c_copy_for_traversing.remove(
                                             (d_rev[edge_number[1]], d_rev[edge_number[0]]))
-                        # 算面积时不需要闭环
+                        # Remove closing vertex for area computation
                         simple_cycle.pop(-1)
                         simple_cycle_number.pop(-1)
-                        # 存起来（逆时针计算面积，如果面积为负则不加入，说明是最大的那个）
+                        # Store cycle (CCW area check omitted; negative would indicate outermost)
                         polygon_counterclockwise = [(int(p[0]), -int(p[1])) for p in simple_cycle]
                         polygon_counterclockwise.pop(-1)
                         # print('poly_area(polygon_counterclockwise)', poly_area(polygon_counterclockwise))
@@ -1987,7 +1983,7 @@ def get_cycle_basis_and_semantic_2_semansimplified_4extractingboundary(output_po
                         if 1:
                             simple_cycles_c.append(simple_cycle)
                             simple_cycles_number_c.append(simple_cycle_number)
-                            # 公共最大语义（最大的那个圈就不用算了），得到该simple_cycle的语义并记录
+                            # Majority semantic (skip largest outer cycle); tally semantics for this cycle
                             semantic_result = {}
                             for semantic_label in range(0, 7):
                                 semantic_result[semantic_label] = 0
@@ -1997,14 +1993,14 @@ def get_cycle_basis_and_semantic_2_semansimplified_4extractingboundary(output_po
                                         semantic_result[_] += 1
 
                             # print(semantic_result)
-                            # 如果最高票相同则等概率随机选一个（注意13不算）
+                            # If top counts tie choose uniformly at random (label 13 excluded in original variant)
                             this_cycle_semantic = sorted(semantic_result.items(), key=lambda d: d[1], reverse=True)
                             this_cycle_result = None
                             if this_cycle_semantic[0][1] > this_cycle_semantic[1][1]:
-                                # 以唯一最高票为准
+                                # Unique highest vote wins
                                 this_cycle_result = this_cycle_semantic[0][0]
                             else:
-                                # 找出所有最高票数并等概率随机抽一个
+                                # Collect all labels sharing highest vote count and sample uniformly
                                 this_cycle_results = [i[0] for i in this_cycle_semantic if
                                                       i[1] == this_cycle_semantic[0][1]]
                                 if 6 in this_cycle_results:
@@ -2032,17 +2028,17 @@ def get_cycle_basis_and_semantic_2_semansimplified_4extractingboundary(output_po
     return d_rev, simple_cycles, simple_cycles_semantics
 
 def edges_to_coordinates(edges_array, vertices_list):
-    n = int(np.sqrt(len(edges_array)))  # 根据边数组长度计算顶点数目
+    n = int(np.sqrt(len(edges_array)))  # Derive vertex count from flattened adjacency (n^2 length)
     edges_coordinates = []
-    # 遍历边数组，找到值为 1 的位置
+    # Scan edge array indices where value == 1
     for idx, value in enumerate(edges_array):
         if value == 1:
-            # 计算对应的顶点索引
+            # Compute endpoint indices
             vertex1_idx, vertex2_idx = divmod(idx, n)
-            # 从顶点列表中获取对应的坐标
+            # Look up vertex coordinates
             vertex1 = vertices_list[vertex1_idx]
             vertex2 = vertices_list[vertex2_idx]
-            # 将边表示为坐标对
+            # Represent edge as coordinate pair
             edge_coordinates = (vertex1, vertex2)
             edges_coordinates.append(edge_coordinates)
     return edges_coordinates
@@ -2099,7 +2095,7 @@ def graph_level_feature_analysis_for_cvae():
         rn.append(len(test_graph['polygons']))
         en.append(np.sum(np.triu(np.array(test_graph['adjacency_matrix']))))
 
-        # 找到所有圈的数量
+    # Count simple cycles of various lengths via adjacency matrix traces
         circles_of_length_3 = np.trace(np.linalg.matrix_power(np.array(test_graph['adjacency_matrix']), 3)) / 6
         circles_of_length_4 = np.trace(np.linalg.matrix_power(np.array(test_graph['adjacency_matrix']), 4)) / 8
         circles_of_length_5 = np.trace(np.linalg.matrix_power(np.array(test_graph['adjacency_matrix']), 5)) / 10
@@ -2133,7 +2129,7 @@ def graph_level_feature_analysis_for_cvae():
         rn.append(len(train_graph['polygons']))
         en.append(np.sum(np.triu(np.array(train_graph['adjacency_matrix']))))
 
-        # 找到所有圈的数量
+    # Count simple cycles of various lengths via adjacency matrix traces
         circles_of_length_3 = np.trace(np.linalg.matrix_power(np.array(train_graph['adjacency_matrix']), 3)) / 6
         circles_of_length_4 = np.trace(np.linalg.matrix_power(np.array(train_graph['adjacency_matrix']), 4)) / 8
         circles_of_length_5 = np.trace(np.linalg.matrix_power(np.array(train_graph['adjacency_matrix']), 5)) / 10
@@ -2159,7 +2155,7 @@ def graph_level_feature_analysis_for_cvae():
         rn.append(len(val_graph['polygons']))
         en.append(np.sum(np.triu(np.array(val_graph['adjacency_matrix']))))
 
-        # 找到所有圈的数量
+    # Count simple cycles of various lengths via adjacency matrix traces
         circles_of_length_3 = np.trace(np.linalg.matrix_power(np.array(val_graph['adjacency_matrix']), 3)) / 6
         circles_of_length_4 = np.trace(np.linalg.matrix_power(np.array(val_graph['adjacency_matrix']), 4)) / 8
         circles_of_length_5 = np.trace(np.linalg.matrix_power(np.array(val_graph['adjacency_matrix']), 5)) / 10
@@ -2184,19 +2180,19 @@ def graph_level_feature_analysis_for_cvae():
             'loop_number': ln,
         }
     )
-    # 计算相关性矩阵
+    # Compute Pearson correlation matrix
     correlation_matrix = df.corr()
     with pd.option_context('display.max_rows', None, 'display.max_columns', None):
         print('--------------------------------------------------------------------------------------------------')
         print(correlation_matrix)
 
-    # 计算斯皮尔曼秩相关系数
+    # Compute Spearman rank correlation matrix
     spearman_corr_matrix = df.corr(method='spearman')
     with pd.option_context('display.max_rows', None, 'display.max_columns', None):
         print('--------------------------------------------------------------------------------------------------')
         print(spearman_corr_matrix)
 
-    # 计算肯德尔等级相关系数
+    # Compute Kendall rank correlation matrix
     kendall_corr_matrix = df.corr(method='kendall')
     with pd.option_context('display.max_rows', None, 'display.max_columns', None):
         print('--------------------------------------------------------------------------------------------------')

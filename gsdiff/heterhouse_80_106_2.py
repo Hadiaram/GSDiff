@@ -109,24 +109,25 @@ class TransformerLayer(nn.Module):
 
     def forward(self, corners, global_attn_matrix,
                 bb_semantics_embedding, cross_attn_mask):
-        '''corners: (batch size, 53(含padding), 512(角点空间上的维数))
-          global_attn_matrix: (batch size, 53, 53) 非padding（左上角）为True，padding为False
-          bbdiagram_semantics_embedding: (batch size, 8(含padding), 512(拓扑图节点空间上的维数))
-          bbdiagram_semantics_padding_mask: (batch size, 8, 1) 非padding为1，padding为0'''
+        '''Forward pass.
 
-        '''v-v attn. use Pre-Norm.'''
+        Args:
+            corners: (batch size, 53 incl. padding, 512 corner feature dim)
+            global_attn_matrix: (batch size, 53, 53) non-padding (upper-left) True, padding False
+            bb_semantics_embedding: (batch size, 8 incl. padding, 512 topology node feature dim)
+            cross_attn_mask: (batch size, 8, 1) non-padding 1, padding 0
+        '''
+        # v-v attention (Pre-Norm)
         corners_normed1 = self.corner_norm(corners)
         global_attn = self.corner_global_attn(corners_normed1, corners_normed1, corners_normed1, global_attn_matrix)
         corners = corners + global_attn
 
-
-        '''corners单方面从房间中汇聚信息。'''
+        # Corners unilaterally aggregate information from rooms
         corners_normed2 = self.corner_norm(corners)
-        # print(bb_semantics_embedding.shape[2], corners_normed2.shape[2])
         cross_attn = self.corner_cross_attn(corners_normed2, bb_semantics_embedding, bb_semantics_embedding, cross_attn_mask)
         corners = corners + cross_attn
 
-        '''FFN'''
+        # FFN
         corners_normed3 = self.corner_norm(corners)
         corners = corners + self.corner_feedforward(corners_normed3)
 

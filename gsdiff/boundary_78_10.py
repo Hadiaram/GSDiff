@@ -8,7 +8,7 @@ import torch
 class FrozenBatchNorm2d(torch.nn.Module):
     def __init__(self, n, eps=1e-5):
         super(FrozenBatchNorm2d, self).__init__()
-        # 防止反向传播更新
+    # Prevent gradient updates (frozen BatchNorm)
         self.register_buffer("weight", torch.ones(n))
         self.register_buffer("bias", torch.zeros(n))
         self.register_buffer("running_mean", torch.zeros(n))
@@ -45,7 +45,7 @@ class Identity(nn.Module):
         return x
 
 class BoundaryModel(nn.Module):
-    # 输入是3个通道的RGB图，输出还是相同通道数
+    # Input: 3-channel RGB image; output retains same channel count
     def __init__(self):
         super(BoundaryModel, self).__init__()
 

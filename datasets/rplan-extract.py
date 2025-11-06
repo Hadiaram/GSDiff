@@ -103,30 +103,30 @@ def isvalid2(img):
 
 
 
-# 获取'bin_imgs'目录下所有文件
+# Get all files under 'bin_imgs' directory
 bin_imgs = os.listdir('rplandata/Data/bin_imgs')
-# 初始化计数器
+# Initialize counter
 count = 0
-# 遍历文件
+# Iterate over files
 for fn in tqdm(bin_imgs):
-    # 文件计数
+    # Increment file counter
     count += 1
-    # 初始化最终图像
+    # Initialize final image buffer
     final = None
-    # 以灰度模式读取二值图像
+    # Read binary image in grayscale mode
     bin_img = cv2.imread('rplandata/Data/bin_imgs/' + fn, cv2.IMREAD_GRAYSCALE)
-    # 打印出图像计数、文件名、图像尺寸及一个随机像素点的值，用于测试数据正确性
+    # Debug (disabled): print count, filename, shape, random pixel value
     # print(count, fn, bin_img.shape, bin_img[random.randint(0, 255), random.randint(0, 255)])
     # 将读取的图像写入文件以保存
 
     # cv2.imwrite('./rplandata/Data/t0_' + fn, bin_img)
-    # 初始化生命周期变量
+    # Initialize life variable
     life = 31
-    # 当生命周期不为0时执行循环
+    # Loop while life >= 0
     while life >= 0:
-        # 生命周期递减
+    # Decrement life
         life -= 1
-        # 获取连通区域的数量
+    # Get connected component count
         num, labels, stats, centroids = cv2.connectedComponentsWithStats(fix_cv2_bug(bin_img), connectivity=8)
         # print('num', num, stats)
         # 试图通过腐蚀操作简化图像

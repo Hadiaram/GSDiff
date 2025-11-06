@@ -12,7 +12,7 @@ np.set_printoptions(threshold=np.inf, linewidth=999999)
  
 class lifull(Dataset):
     def __init__(self, mode):
-        # 语义字典
+    # Semantics dictionary
         self.semantics_dict = {
             'living_room': 1,
             'kitchen': 2,
@@ -37,14 +37,14 @@ class lifull(Dataset):
         
 
     def load_data(self, json_path, npy_dir):
-        # 读取 JSON 文件
+    # Read JSON file
         with open(json_path, 'r') as file:
             data = json.load(file)
         
-        # 初始化整合数据结构
+    # Initialize integrated data structure
         integrated_data = {}
 
-        # 整合图像信息
+    # Integrate image information
         for image_info in tqdm(data['images']):
             image_id = image_info['id']
             integrated_data[image_id] = {
@@ -52,7 +52,7 @@ class lifull(Dataset):
                 'npy_data': None
             }
 
-        # 整合注释信息
+    # Integrate annotation information
         for annotation in tqdm(data['annotations']):
             image_id = annotation['image_id']
             if image_id in integrated_data:
@@ -61,60 +61,60 @@ class lifull(Dataset):
                     'semantic': annotation['semantic']
                 })
         
-            # 提供的注释数据
+            # Provided annotation data
             annotations = integrated_data[image_id]['annotations']
             
-            # 初始化点集和语义集
+            # Initialize point set and semantics set
             point_set = []
             semantic_set = []
             
-            # 遍历注释数据
+            # Iterate through annotation entries
             for annotation in annotations:
                 point = annotation['point']
                 semantics = annotation['semantic']
                 
-                # 添加点到点集
+                # Append point to set
                 point_set.append(point)
                 
-                # 创建multi-hot编码的向量
-                semantic_vector = [0] * len(self.semantics_dict)  # 初始化为全0的向量
+                # Create multi-hot encoded vector
+                semantic_vector = [0] * len(self.semantics_dict)  # Initialize zero vector
                 for semantic in semantics:
                     if semantic in self.semantics_dict:
                         semantic_index = self.semantics_dict[semantic]
-                        semantic_vector[semantic_index] = 1  # 设置对应的索引为1
+                        semantic_vector[semantic_index] = 1  # Set corresponding index to 1
                 
-                # 添加语义向量到语义集
+                # Append semantic vector to collection
                 semantic_set.append(semantic_vector)
             assert len(point_set) == len(semantic_set)
-            corners_with_semantics = np.concatenate(((np.array(point_set) - 256) / 256, np.array(semantic_set)), axis=1) # 我们只有这里除以256，就当和rplan数据一样了
+            corners_with_semantics = np.concatenate(((np.array(point_set) - 256) / 256, np.array(semantic_set)), axis=1) # Only divide by 256 here to match rplan data scale
             corners_with_semantics_pad = np.zeros((53 - len(corners_with_semantics), 15))
             corners_with_semantics = np.concatenate((corners_with_semantics, corners_with_semantics_pad), axis=0)
             integrated_data[image_id]['corners_with_semantics'] = corners_with_semantics
 
         for image_id in integrated_data.keys():
             integrated_data[image_id].pop('annotations', None)
-        # 整合 npy 数据
+    # Integrate npy data
         for image_id in integrated_data.keys():
             npy_path = os.path.join(npy_dir, f"{image_id}.npy")
             if os.path.exists(npy_path):
                 npy_data = np.load(npy_path, allow_pickle=True).item()
-                # 清理不需要的 'quatree' 键
+                # Remove unnecessary 'quatree' key
                 npy_data.pop('quatree', None)
                 integrated_data[image_id]['npy_data'] = npy_data
-                # 获取所有的点并分配索引
+                # Collect all points and assign indices
                 points_npy = list(npy_data.keys())
                 point_indices = {point: idx for idx, point in enumerate(points_npy)}
                 
-                # 初始化邻接矩阵
+                # Initialize adjacency matrix
                 n = len(points_npy)
                 adjacency_matrix = np.zeros((53, 53), dtype=np.uint8)
                 adjacency_matrix[:n, :n] = 1
                 edges = np.zeros((53, 53), dtype=np.uint8)
 
-                # 填充邻接矩阵
+                # Populate adjacency matrix
                 for point, neighbors in npy_data.items():
                     for neighbor in neighbors:
-                        if neighbor != (-1, -1):  # 忽略不存在的邻居
+                        if neighbor != (-1, -1):  # Ignore placeholder non-existent neighbor
                             point_idx = point_indices[point]
                             neighbor_idx = point_indices[neighbor]
                             edges[point_idx, neighbor_idx] = 1

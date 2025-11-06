@@ -21,28 +21,28 @@ import os
 
 
 def deep_compare(a, b):
-    '''判断两个字典数据是否完全相同'''
-    # 如果类型不同，直接返回 False
+    '''Determine whether two Python data structures (dict/list/tuple/ndarray/scalar) are completely identical.'''
+    # If types differ, return False immediately
     if type(a) != type(b):
         return False
 
-    # 如果是字典，比较它们的 key 与对应的值
+    # If dictionaries, compare keys and then recursively compare values
     if isinstance(a, dict):
         if a.keys() != b.keys():
             return False
         return all(deep_compare(a[key], b[key]) for key in a)
 
-    # 如果是列表或元组，则逐项比较
+    # If list or tuple, compare element by element
     elif isinstance(a, (list, tuple)):
         if len(a) != len(b):
             return False
         return all(deep_compare(item1, item2) for item1, item2 in zip(a, b))
 
-    # 如果是 numpy 数组，则使用 np.array_equal 比较
+    # If numpy array, use np.array_equal for exact match
     elif isinstance(a, np.ndarray):
         return np.array_equal(a, b)
 
-    # 其他类型直接比较（例如 int, float, str 等）
+    # Other types: direct comparison (int, float, str, etc.)
     else:
         return a == b
 
@@ -52,7 +52,7 @@ def check_subdir_file_counts(base_dir):
         full_path = os.path.join(base_dir, subdir)
         file_list = [f for f in os.listdir(full_path)
                      if os.path.isfile(os.path.join(full_path, f))]
-        print('文件数' + str(len(file_list)))
+    print('File count: ' + str(len(file_list)))
 
 
 if not os.path.exists('rplandata/Data/rplang-v3-bubble-diagram'):
@@ -94,17 +94,17 @@ for test_file in tqdm(test_files):
         '''
     '''coords_withsemantics, (53, 16)'''
     corners_withsemantics = test_graph['corner_list_np_normalized_padding_withsemantics']
-    # 初始化一个n*9的新数组(53, 9)
+    # Initialize new (n,9) array (here n=53)
     corners_withsemantics_simplified = np.zeros((corners_withsemantics.shape[0], 9))
-    # 复制第0、1列
+    # Copy columns 0 and 1
     corners_withsemantics_simplified[:, 0:2] = corners_withsemantics[:, 0:2]
-    # 计算新的第2列
+    # Compute new column 2 as sum of original columns [2,6,12]
     corners_withsemantics_simplified[:, 2] = (corners_withsemantics[:, [2, 6, 12]]).sum(axis=1)
-    # 计算新的第3列
+    # Compute new column 3 as sum of original columns [3,7,8,9,10]
     corners_withsemantics_simplified[:, 3] = (corners_withsemantics[:, [3, 7, 8, 9, 10]]).sum(axis=1)
-    # 计算新的第4列
+    # Compute new column 4 as sum of original columns [13,14]
     corners_withsemantics_simplified[:, 4] = (corners_withsemantics[:, [13, 14]]).sum(axis=1)
-    # 复制第4、5、11、15列
+    # Copy original columns 4,5,11,15 into new columns 5,6,7,8
     corners_withsemantics_simplified[:, 5] = corners_withsemantics[:, 4]
     corners_withsemantics_simplified[:, 6] = corners_withsemantics[:, 5]
     corners_withsemantics_simplified[:, 7] = corners_withsemantics[:, 11]
@@ -133,7 +133,7 @@ for test_file in tqdm(test_files):
     edges_test_depadded = np.concatenate((1 - edges_test_depadded, edges_test_depadded), axis=2)
 
     ''' get planar cycles'''
-    # 形状为 (1, n, 14) 的 ndarray，包含 0 和 1;找到每个子数组中 1 所在的索引,用 99999 替换值为 0 的原始元素
+    # semantics_gt_i_transform_test: shape (1,n,14) with 0/1; replace 0s with 99999 and keep index values where 1
     semantics_gt_i_transform_test = semantics_0_test_depadded
     semantics_gt_i_transform_indices_test = np.indices(semantics_gt_i_transform_test.shape)[-1]
     semantics_gt_i_transform_test = np.where(semantics_gt_i_transform_test == 1,

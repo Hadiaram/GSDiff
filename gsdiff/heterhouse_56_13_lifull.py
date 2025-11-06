@@ -147,7 +147,7 @@ class EdgeModel(nn.Module):
 
         random_lambda = torch.rand((corners.shape[0], 2809, 1), device=corners.device)
         edge_coords3 = edge_coords1 * random_lambda + edge_coords2 * (1 - random_lambda)
-        edge_semans3 = torch.zeros_like(edge_semans1) # 随机插值点无法得知语义
+        edge_semans3 = torch.zeros_like(edge_semans1) # Semantics of randomly interpolated points are unknown
 
 
 

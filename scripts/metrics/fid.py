@@ -1,11 +1,11 @@
 '''
 Martin Heusel, Hubert Ramsauer, Thomas Unterthiner, Bernhard Nessler, and Sepp
-Hochreiter. 2017. Gans trained by a two time-scale update rule converge to a local
-nash equilibrium. Advances in neural information processing systems 30 (2017).
+Hochreiter. 2017. GANs trained by a two time-scale update rule converge to a local
+Nash equilibrium. Advances in Neural Information Processing Systems 30 (2017).
 
-计算方法：
-1 把gt和pred结果按照完全相同的方式进行渲染
-2 把渲染的两组图片分别放进/images_path1 /images_path2
+Computation method:
+1 Render the gt and pred results in exactly the same way.
+2 Put the two rendered image sets into /images_path1 and /images_path2.
 '''
 from tqdm import tqdm
 import os
@@ -48,22 +48,22 @@ def fid(path1, path2, fid_batch_size, fid_device):
     start_idx1 = 0
     for batch1 in tqdm(dataloader1):
         batch1 = batch1.to(fid_device) # torch.Size([64, 3, 256, 256])
-        '''FID的计算器中，我们也是用了inception网络。
-        inception其实就是特征提取的网络，最后一层输出图像的类别。
-        不过我们会去除最后的全连接或者池化层，使得我们得到一个2048维度的特征。'''
+        '''In FID we also employ the Inception network.
+        It serves purely as a feature extractor whose final layer would normally output class logits.
+        We remove the final fully-connected / pooling layer so we obtain a 2048‑D feature vector per image.'''
         with torch.no_grad():
             pred1 = model(batch1)[0] # torch.Size([64, 2048, 1, 1])
         pred1 = pred1.squeeze(3).squeeze(2).cpu().numpy() # np.ndarray([64, 2048])
         pred_arr1[start_idx1:start_idx1 + fid_batch_size] = pred1
         start_idx1 = start_idx1 + fid_batch_size
-    # 特征空间是2048维空间，mu表示某一组数据在2048维特征空间上的均值（2048维）
-    # 均值偏的越大，两组数据越不相似
+    # Feature space is 2048-D; mu is the 2048-D mean feature vector for an image set.
+    # The larger the mean difference, the more dissimilar the two distributions.
     mu1 = np.mean(pred_arr1, axis=0) # np.ndarray([2048])
-    # 协方差矩阵，表示高维数据的每一维上的方差（对角线元素）和不同维度的相关性（其他元素）
-    # 简单衡量了分布的形状
+    # Covariance matrix: diagonal = variance of each dimension; off-diagonals = cross-dimension correlations.
+    # Roughly captures the shape of the distribution.
     sigma1 = np.cov(pred_arr1, rowvar=False) # np.ndarray([2048, 2048])
 
-    ''' 对另一组图像做同样的操作 '''
+    ''' Do the same processing for the second image set. '''
     files2 = [os.path.join(path2, fn) for fn in os.listdir(path2)]
     dataset2 = ImagePathDataset(files2, transforms=TF.ToTensor())
     dataloader2 = torch.utils.data.DataLoader(dataset2,
@@ -83,10 +83,10 @@ def fid(path1, path2, fid_batch_size, fid_device):
     mu2 = np.mean(pred_arr2, axis=0)
     sigma2 = np.cov(pred_arr2, rowvar=False)
 
-    eps = 1e-6 # 数值稳定性
-    diff = mu1 - mu2 # 均值差
-    covmean = linalg.sqrtm(sigma1.dot(sigma2)) # 两个协方差矩阵相乘的整体平方根（不是逐元素平方根）
-    tr_covmean = np.trace(covmean) # 迹
+    eps = 1e-6 # Numerical stability
+    diff = mu1 - mu2 # Mean difference
+    covmean = linalg.sqrtm(sigma1.dot(sigma2)) # Matrix square root of sigma1 * sigma2 (not element-wise)
+    tr_covmean = np.trace(covmean) # Trace
     fid_value = (diff.dot(diff) + np.trace(sigma1) + np.trace(sigma2) - 2 * tr_covmean)
 
     return fid_value

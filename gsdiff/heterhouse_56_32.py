@@ -116,13 +116,12 @@ class TransformerLayer(nn.Module):
         global_attn = self.edge_global_attn(edges_normed1, edges_normed1, edges_normed1, edges_attn_matrix)
         edges = edges + global_attn
 
-
-        '''单方面从房间中汇聚信息。'''
+        # Unilaterally aggregate information from rooms.
         edges_normed2 = self.edge_norm(edges)
         cross_attn = self.cross_attn(edges_normed2, x, x, cross_attn_mask)
         edges = edges + cross_attn
 
-        '''FFN'''
+        # FFN
         edges_normed3 = self.edge_norm(edges)
         edges = edges + self.edge_feedforward(edges_normed3)
 
@@ -173,7 +172,7 @@ class BoundEdgeModel(nn.Module):
         # self.bn16 = FrozenBatchNorm2d(1024)
         # self.activation = nn.ReLU()
         self.sinopos = PositionEmbeddingSine()
-        # self.layer_embedding = nn.Parameter(torch.Tensor(1, 256)) # 我们选用了1个尺度的特征图
+    # self.layer_embedding = nn.Parameter(torch.Tensor(1, 256)) # We selected one scale of feature map
 
 
 
@@ -205,7 +204,7 @@ class BoundEdgeModel(nn.Module):
 
         random_lambda = torch.rand((corners.shape[0], 2809, 1), device=corners.device)
         edge_coords3 = edge_coords1 * random_lambda + edge_coords2 * (1 - random_lambda)
-        edge_semans3 = torch.zeros_like(edge_semans1) # 随机插值点无法得知语义
+        edge_semans3 = torch.zeros_like(edge_semans1) # Semantics of randomly interpolated points are unknown
 
 
 
@@ -309,7 +308,7 @@ class BoundEdgeModel(nn.Module):
         proj_16 = self.proj16(feat_16).permute(0, 2, 3, 1).view(batch_size, 16**2, 256) # (bs, 256, 256)
         x = pos_16 + proj_16 # (bs, 256, 256)
 
-        # 交叉注意力padding掩码 (bs, 2809, 256)
+    # Cross-attention padding mask (bs, 2809, 256)
         cross_attn_mask = global_attn_matrix.view(batch_size, 2809, 1).repeat(1, 1, x.shape[1]).to(x.dtype)
 
 

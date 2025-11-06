@@ -59,7 +59,7 @@ from scipy.stats import truncnorm
 
 
 def truncated_normal(tensor, mu, sigma, lower, upper, dtype, device):
-    # 生成与目标张量相同形状的截尾高斯分布样本
+    # Generate truncated Gaussian samples with the same shape as the target tensor
     with torch.no_grad():
         size = tensor.shape
         tmp = truncnorm.rvs((lower - mu) / sigma, (upper - mu) / sigma, loc=mu, scale=sigma, size=size)
@@ -82,13 +82,13 @@ while step < total_steps:
     corners = corners_withsemantics[:, :, :2]
     semantics = corners_withsemantics[:, :, 2:]
 
-    # 对于前n个点，即非padding的点，每个点以1%的概率随机缺失，
-    # 实现方法：考虑我们的所有数据：
-    # corners(bs, 53, 2)，semantics(bs, 53, 7)，
-    # global_attn_matrix(bs, 53, 53)为左上角1的矩阵，
-    # corners_padding_mask(bs, 53, 1)为上1下0，
-    # edges(bs, 2809, 1)<==>(bs, 53, 53)为只有边存在时才为1的矩阵
-    # 我们考虑将【corners_padding_mask(bs, 53, 1)为上1下0】进行随机变换，根据之后的变换结果处理剩下的几个数据
+    # For the first n (non-padding) points: randomly delete each point with 1% probability.
+    # Implementation idea: consider all relevant tensors:
+    # corners(bs, 53, 2), semantics(bs, 53, 7),
+    # global_attn_matrix(bs, 53, 53): top-left block of ones (valid region), zeros elsewhere.
+    # corners_padding_mask(bs, 53, 1): ones for valid points then zeros for padding.
+    # edges(bs, 2809, 1) <=> (bs, 53, 53) adjacency matrix with 1 only where an edge exists.
+    # Randomly perturb the padding mask, then update the other tensors accordingly.
     '''padding_one_hot = torch.cat((1 - corners_padding_mask, corners_padding_mask), dim=2).reshape(batch_size * 53, 2,
                                                                                                  1).to(torch.float64)
     q_padding_one_hot = torch.tensor([[1, 0.01],
@@ -97,9 +97,9 @@ while step < total_steps:
     padding_prob = torch.bmm(q_padding_one_hot, padding_one_hot).reshape(batch_size * 53, 2)
     padding_sample = torch.multinomial(padding_prob, num_samples=1)
     corners_padding_mask = padding_sample.reshape(batch_size, 53, 1).to(corners_padding_mask.dtype)
-    # 重新处理corners，semantics，padding部分置0
-    corners = corners * corners_padding_mask.expand(batch_size, 53, 2)  # padding只能是0
-    semantics = semantics * corners_padding_mask.expand(batch_size, 53, 7)  # padding只能是0
+    # Recompute corners & semantics; zero-out padding region
+    corners = corners * corners_padding_mask.expand(batch_size, 53, 2)  # padding must remain 0
+    semantics = semantics * corners_padding_mask.expand(batch_size, 53, 7)  # padding must remain 0
     # global_attn_matrix(bs, 53, 53)
     global_attn_matrix = torch.logical_and(corners_padding_mask.to(torch.bool).expand(batch_size, 53, 53),
                                            corners_padding_mask.to(torch.bool).expand(batch_size, 53, 53).transpose(1,
@@ -108,8 +108,8 @@ while step < total_steps:
     edges = torch.logical_and(edges.to(torch.bool).reshape(batch_size, 53, 53), global_attn_matrix).to(
         torch.uint8).reshape(batch_size, 2809, 1)'''
 
-    # 对于padding的点，每个点以1%的概率随机变成噪点，
-    # 实现方法：和随机缺失一样的
+    # For padding points: with 1% probability each becomes a noisy pseudo-point.
+    # Implementation: same as random deletion above.
     '''padding2_one_hot = torch.cat((1 - corners_padding_mask, corners_padding_mask), dim=2).reshape(batch_size * 53, 2,
                                                                                                   1).to(torch.float64)
     q_padding2_one_hot = torch.tensor([[0.99, 0],
@@ -119,9 +119,9 @@ while step < total_steps:
     padding2_sample = torch.multinomial(padding2_prob, num_samples=1)
     corners_padding2_mask = padding2_sample.reshape(batch_size, 53, 1).to(corners_padding_mask.dtype)
     noisy_corners_padding_mask = corners_padding2_mask - corners_padding_mask
-    # 重新处理corners，semantics，padding部分置0
-    # corners生成截尾标准高斯分布，然后乘以噪声掩膜noisy_corners_padding_mask，即可得到噪声坐标，加到corners即可
-    # 语义可以生成均匀取值0或1；同样需要乘以噪声掩膜noisy_corners_padding_mask，然后加到semantics
+    # Recompute corners & semantics; zero-out padding region.
+    # Corners: sample truncated standard normal noise, mask by noisy_corners_padding_mask, add to corners.
+    # Semantics: sample Bernoulli (0/1), mask, then add to semantics.
     corners = corners + truncated_normal(torch.empty((batch_size, 53, 2), dtype=corners.dtype, device=corners.device),
                                      0, 1, -1, 1, dtype=corners.dtype, device=corners.device) * noisy_corners_padding_mask.expand(batch_size, 53, 2)
     semantics = semantics + torch.randint(low=0, high=1+1, size=semantics.shape, dtype=semantics.dtype, device=semantics.device) * noisy_corners_padding_mask.expand(batch_size, 53, 7)
@@ -129,19 +129,19 @@ while step < total_steps:
     corners_padding_mask = corners_padding2_mask
     global_attn_matrix = torch.logical_and(corners_padding_mask.to(torch.bool).expand(batch_size, 53, 53),
                                            corners_padding_mask.to(torch.bool).expand(batch_size, 53, 53).transpose(1, 2))'''
-    # print(global_attn_matrix.to(torch.uint8)) # 验证正确
-    # 边相比于随机删除之后的，只是增加了噪点，没有带来新的边，所以不变
+    # print(global_attn_matrix.to(torch.uint8)) # Verified correct
+    # Edges unchanged: noise only adds isolated points; no new edges.
 
-    # 指定参数
+    # Specify parameters
     mu = 0
     sigma = 1 / 128
     lower = -3 * sigma
     upper = 3 * sigma
     corners_noise = truncated_normal(torch.empty((batch_size, 53, 2), dtype=corners.dtype, device=corners.device),
                                      mu, sigma, lower, upper, dtype=corners.dtype, device=corners.device)
-    corners = corners + corners_noise  # 截尾高斯噪声 -> 和角点相同的归一化倍数对应标准差
+    corners = corners + corners_noise  # Truncated Gaussian noise (matches corner normalization scale)
 
-    # 在56-3的基础上引入一些对7维语义的扰动，对每个语义随机反转(每一种1%概率)
+    # Add semantic perturbations: independently flip each semantic dimension (1% probability each)
     semantics_one_hot = torch.stack((1 - semantics, semantics), dim=3).reshape(batch_size * 53 * 13, 2, 1)
     q_semantics_one_hot = torch.tensor([[0.99, 0.01],
                                         [0.01, 0.99]], dtype=semantics_one_hot.dtype, device=semantics_one_hot.device)[
@@ -149,7 +149,7 @@ while step < total_steps:
     semantics_prob = torch.bmm(q_semantics_one_hot, semantics_one_hot).reshape(batch_size * 53 * 13, 2)
     semantics_sample = torch.multinomial(semantics_prob, num_samples=1)
     semantics = semantics_sample.reshape(batch_size, 53, 13).to(corners_withsemantics.dtype)
-    semantics = semantics * corners_padding_mask.expand(batch_size, 53, 13)  # padding只能是0
+    semantics = semantics * corners_padding_mask.expand(batch_size, 53, 13)  # padding must remain 0
 
     edges = torch.cat((1 - edges, edges), dim=2).type(torch.uint8)
 
@@ -235,7 +235,7 @@ while step < total_steps:
             corners_val = corners_withsemantics_val[:, :, :2]
             semantics_val = corners_withsemantics_val[:, :, 2:]
             corners_val = corners_val + (torch.randn_like(corners_val, dtype=corners_val.dtype,
-                                                          device=corners_val.device) * 1 / 128)  # 标准高斯噪声 -> 和角点相同的归一化倍数对应标准差
+                                                          device=corners_val.device) * 1 / 128)  # Standard Gaussian noise (same normalization scale as corners)
             global_attn_matrix_val = global_attn_matrix_val.to(device)
             corners_padding_mask_val = corners_padding_mask_val.to(device)
             edges_val = edges_val.to(device).type(torch.uint8)

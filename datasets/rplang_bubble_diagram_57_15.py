@@ -7,8 +7,8 @@ from . import tiny_graph
 torch.set_printoptions(threshold=np.inf, linewidth=999999)
 np.set_printoptions(threshold=np.inf, linewidth=999999)
 
-''' 房间类型是7类，实际不包含外部所以只有6类
- 房间数最大是8最小是4'''
+'''There are 7 nominal room types; excluding exterior yields 6 actual classes.
+Room count ranges from 4 (min) to 8 (max).'''
 class RPlanGBubbleDiagram(Dataset):
     def __init__(self, mode):
         super().__init__()

@@ -81,12 +81,12 @@ dataloader_test_for_gt_rendering = DataLoader(dataset_test_for_gt_rendering, bat
 dataloader_test_iter_for_gt_rendering = iter(cycle(dataloader_test_for_gt_rendering))
 
 
-'''为了在测试集上计算FID、KID等指标，需要先把测试集渲染。'''
+'''To compute FID and KID on the test set, the ground‑truth test graphs are first rasterized to images.'''
 gt_dir_test = output_dir + 'test_gt' + '/'
 if os.path.exists(gt_dir_test):
-    shutil.rmtree(gt_dir_test)  # 删除路径
-os.makedirs(gt_dir_test)  # 创建路径
-# 测试集的3000个样本逐一渲染成图片
+    shutil.rmtree(gt_dir_test)  # Remove existing directory
+os.makedirs(gt_dir_test)  # Create directory
+# Render each of the 3000 test samples to an image
 # colors = {6: (0, 0, 0), 0: (222, 241, 244), 1: (159, 182, 234), 2: (92, 112, 107), 3: (95, 122, 224), 4: (123, 121, 95), 5: (143, 204, 242)}
 # colors = {6: (0, 0, 0), 0: (244, 241, 222), 1: (234, 182, 159), 2: (107, 112, 92), 3: (224, 122, 95), 4: (95, 121, 123), 5: (242, 204, 143)}
 colors = {1: (225, 255, 193),
@@ -127,7 +127,7 @@ for batch_count in tqdm(range(batch_numbers)):
         edges_test_depadded = np.concatenate((1 - edges_test_depadded, edges_test_depadded), axis=2)
 
         ''' get planar cycles'''
-        # 形状为 (1, n, 14) 的 ndarray，包含 0 和 1;找到每个子数组中 1 所在的索引,用 99999 替换值为 0 的原始元素
+    # Array shape (1, n, 14) with 0/1; replace each 1 by its channel index, 0 by 99999 sentinel
         semantics_gt_i_transform_test = semantics_0_test_depadded
         semantics_gt_i_transform_indices_test = np.indices(semantics_gt_i_transform_test.shape)[-1]
         semantics_gt_i_transform_test = np.where(semantics_gt_i_transform_test == 1,
@@ -170,22 +170,22 @@ for batch_count in tqdm(range(batch_numbers)):
 
 
 '''Neural Network'''
-# 单独训练是因为比联合训练耗时短且效果可控，且方便通过加噪声来增强抗噪能力
+# Standalone training was used (faster and easier to control than joint training) and allows noise augmentation
 model_path_EdgeModel = 'outputs/structure-56-34-interval1000/model_stage2_best_099000.pt'
 model_EdgeModel = EdgeModel().to(device)
 model_EdgeModel.load_state_dict(torch.load(model_path_EdgeModel, map_location=device))
-# 冻结EdgeModel参数
+# Freeze EdgeModel parameters
 for param in model_EdgeModel.parameters():
     param.requires_grad = False
 
-# 扩散模型
+# Diffusion model
 test_metrics = []
 model_path_CDDPMs = ['outputs/structure-77-106-lifull/' + fn for fn in os.listdir('outputs/structure-77-106-lifull') if 'model' in fn and '.pt' in fn]
 for model_path_CDDPM in model_path_CDDPMs:
     if int(model_path_CDDPM[5 + len('outputs/structure-77-106-lifull/'):8 + len('outputs/structure-77-106-lifull/')]) % 1000 == 100: # model1000000.pt
         model_CDDPM = HeterHouseModel().to(device)
         model_CDDPM.load_state_dict(torch.load(model_path_CDDPM, map_location=device))
-        # 冻结EdgeModel参数
+    # Freeze EdgeModel parameters
         for param in model_CDDPM.parameters():
             param.requires_grad = False
 
@@ -272,11 +272,11 @@ for model_path_CDDPM in model_path_CDDPMs:
                                                      resolution=resolution)
             stage1_0_test = (result_corners_inverse_normalized_test, result_semantics_inverse_normalized_test)
 
-            # 统计生成的平均节点数，以此度量复杂程度是否偏简单
+            # Compute average generated node count to assess whether complexity is too low
             node_count = 0
 
 
-            # 可视化
+            # Visualization
             os.mkdir(output_dir + 'test_corner_' + 'step' + str(k_test) + '_' + model_path_CDDPM.split('/')[2].replace('.pt', ''))
             for i in tqdm(range(len(result_corners_inverse_normalized_test))):
                 img = np.ones((resolution, resolution, 3), dtype=np.uint8)
@@ -368,15 +368,15 @@ for model_path_CDDPM in model_path_CDDPMs:
 
             output_dir_test = output_dir + 'test_' + model_path_CDDPM.split('/')[2].replace('.pt', '') + '/'
             if os.path.exists(output_dir_test):
-                shutil.rmtree(output_dir_test)  # 删除路径
-            os.makedirs(output_dir_test)  # 创建路径
+                shutil.rmtree(output_dir_test)  # Remove existing directory
+            os.makedirs(output_dir_test)  # Create directory
             for test_count in tqdm(range(len(dataset_test))):
                 corners_sample_i_test = corners_all_samples_test[test_count]
                 edges_sample_i_test = edges_all_samples_test[test_count]
                 semantics_sample_i_test = semantics_all_samples_test[test_count]
 
                 ''' get planar cycles'''
-                # 形状为 (1, n, 14) 的 ndarray，包含 0 和 1;找到每个子数组中 1 所在的索引,用 99999 替换值为 0 的原始元素
+                # Array shape (1, n, 14) with 0/1; replace each 1 by its channel index, 0 by 99999 sentinel
                 semantics_sample_i_transform_test = semantics_sample_i_test
                 semantics_sample_i_transform_indices_test = np.indices(semantics_sample_i_transform_test.shape)[-1]
                 semantics_sample_i_transform_test = np.where(semantics_sample_i_transform_test == 1,
@@ -412,25 +412,25 @@ for model_path_CDDPM in model_path_CDDPMs:
                 
                 if align_points:
                     align_threshold = round(resolution * 0.01)
-                    # 先清理坐标后面的类别
-                    # 新的多边形数据集，只包含有意义的坐标
+                    # Strip trailing semantic labels after coordinates
+                    # Build cleaned polygon list containing only valid (x,y) coordinate pairs
                     cleaned_polygons = []
-                    # 遍历每个多边形
+                    # Iterate over each polygon
                     for polygon in simple_cycles_test:
                         cleaned_polygon = []
-                        # 遍历多边形中的每个顶点
+                        # Iterate vertices in polygon
                         for vertex in polygon:
-                            # 只取前两个值（有效坐标）
+                            # Keep only first two values (x,y)
                             cleaned_vertex = vertex[:2]
-                            # 添加到清理后的多边形中
+                            # Append to cleaned polygon
                             cleaned_polygon.append(cleaned_vertex)
-                        # 将清理后的多边形添加到新数据集中
+                        # Add cleaned polygon to new dataset
                         cleaned_polygons.append(cleaned_polygon)
                     # print('2', cleaned_polygons)
-                    # x对齐
+                    # X‑axis band alignment
                     for x_bond_left in range(0, resolution - align_threshold):
                         x_bond_right = x_bond_left + align_threshold
-                        # 获取落在这个带里的边
+                        # Collect edges whose endpoints fall inside this horizontal band
                         edges_inbond = []
                         for cp in cleaned_polygons:
                             for p_i, p in enumerate(cp):
@@ -441,29 +441,27 @@ for model_path_CDDPM in model_path_CDDPMs:
                         # print('3', edges_inbond)
                     
                     
-                        # 把这些边按照共享顶点分组
-                        # 创建一个新的 networkx 图
+                        # Group edges by shared endpoints using a temporary networkx graph
                         G_inbond = nx.Graph()
-                        # 为每条边添加一个节点
+                        # Add each geometric edge as a node
                         for edge_inbond in edges_inbond:
                             G_inbond.add_node(edge_inbond)
-                        # 遍历每一对边，检查是否存在共享顶点
+                        # Connect nodes whose underlying edges share a vertex
                         for edge1 in edges_inbond:
                             for edge2 in edges_inbond:
                                 if edge1 != edge2:
-                                    # 如果两条边共享一个顶点，则添加一条边
+                                    # Shared endpoint -> add graph edge
                                     if set(edge1) & set(edge2):
                                         G_inbond.add_edge(edge1, edge2)
-                        # 找到图的所有连通分量
+                        # Extract connected components
                         connected_components_inbond = list(nx.connected_components(G_inbond))
                         # print('4', connected_components_inbond)
                     
-                        # 转换每个连通分量为它包含的边的集合
+                        # Convert components to edge lists
                         grouped_edge_sets = [list(component) for component in connected_components_inbond]
                     
                     
-                        # 打印结果
-                        for i, component_edges in enumerate(grouped_edge_sets):
+                        for i, component_edges in enumerate(grouped_edge_sets):  # For each edge group align X
                             # print(component_edges)
                             component_edges_vertices = []
                             for component_edges_t in component_edges:
@@ -471,36 +469,35 @@ for model_path_CDDPM in model_path_CDDPMs:
                                     component_edges_vertices.append(pnt)
                     
                             # print(f"Connected Component {i}: {component_edges}")
-                            # 对每个边集对齐x
-                            # 求每个边集的x的平均数（取整），然后更新cleaned_polygons中的坐标
+                            # Compute integer mean x of group and update member vertices
                             x_bar = round(sum([(t[0][0] + t[1][0]) for t in component_edges]) / (2 * len(component_edges)))
                     
-                            # 新的多边形数据集，只包含有意义的坐标
+                            # Rebuild cleaned polygon list with updated X values
                             cleaned_polygons_new = []
-                            # 遍历每个多边形
+                            # Iterate over each polygon
                             for polygon in cleaned_polygons:
                                 cleaned_polygon = []
-                                # 遍历多边形中的每个顶点
+                                # Iterate vertices
                                 for vertex in polygon:
                                     if vertex in component_edges_vertices:
-                                        # 只取前两个值（有效坐标）
+                                        # Replace X with aligned mean
                                         cleaned_vertex = (x_bar, vertex[1])
-                                        # 添加到清理后的多边形中
+                                        # Append updated vertex
                                         cleaned_polygon.append(cleaned_vertex)
                                     else:
-                                        # 只取前两个值（有效坐标）
+                                        # Keep original vertex
                                         cleaned_vertex = vertex
-                                        # 添加到清理后的多边形中
+                                        # Append unchanged vertex
                                         cleaned_polygon.append(cleaned_vertex)
-                                # 将清理后的多边形添加到新数据集中
+                                # Add updated polygon to new list
                                 cleaned_polygons_new.append(cleaned_polygon)
                                 # print(cleaned_polygon)
                             cleaned_polygons = cleaned_polygons_new
                     
-                    # y对齐
+                    # Y‑axis band alignment
                     for y_bond_up in range(0, resolution - align_threshold):
                         y_bond_down = y_bond_up + align_threshold
-                        # 获取落在这个带里的边
+                        # Collect edges whose endpoints fall inside this vertical band
                         edges_inbond = []
                         for cp in cleaned_polygons:
                             for p_i, p in enumerate(cp):
@@ -509,52 +506,49 @@ for model_path_CDDPM in model_path_CDDPMs:
                                     if y_bond_up <= e[0][1] <= y_bond_down and y_bond_up <= e[1][1] <= y_bond_down:
                                         edges_inbond.append(e)
                         # print(edges_inbond)
-                        # 把这些边按照共享顶点分组
-                        # 创建一个新的 networkx 图
+                        # Group edges by shared endpoints using a temporary networkx graph
                         G_inbond = nx.Graph()
-                        # 为每条边添加一个节点
+                        # Add each geometric edge as a node
                         for edge_inbond in edges_inbond:
                             G_inbond.add_node(edge_inbond)
-                        # 遍历每一对边，检查是否存在共享顶点
+                        # Connect nodes if underlying edges share a vertex
                         for edge1 in edges_inbond:
                             for edge2 in edges_inbond:
                                 if edge1 != edge2:
-                                    # 如果两条边共享一个顶点，则添加一条边
+                                    # Shared endpoint -> add graph edge
                                     if set(edge1) & set(edge2):
                                         G_inbond.add_edge(edge1, edge2)
-                        # 找到图的所有连通分量
+                        # Extract connected components
                         connected_components_inbond = list(nx.connected_components(G_inbond))
-                        # 转换每个连通分量为它包含的边的集合
+                        # Convert components to edge lists
                         grouped_edge_sets = [list(component) for component in connected_components_inbond]
-                        # 打印结果
-                        for i, component_edges in enumerate(grouped_edge_sets):
+                        for i, component_edges in enumerate(grouped_edge_sets):  # For each edge group align Y
                             # print(component_edges)
                             component_edges_vertices = []
                             for component_edges_t in component_edges:
                                 for pnt in component_edges_t:
                                     component_edges_vertices.append(pnt)
                             # print(f"Connected Component {i}: {component_edges}")
-                            # 对每个边集对齐y
-                            # 求每个边集的y的平均数（取整），然后更新cleaned_polygons中的坐标
+                            # Compute integer mean y of group and update member vertices
                             y_bar = round(sum([(t[0][1] + t[1][1]) for t in component_edges]) / (2 * len(component_edges)))
-                            # 新的多边形数据集，只包含有意义的坐标
+                            # Rebuild cleaned polygon list with updated Y values
                             cleaned_polygons_new = []
-                            # 遍历每个多边形
+                            # Iterate over each polygon
                             for polygon in cleaned_polygons:
                                 cleaned_polygon = []
-                                # 遍历多边形中的每个顶点
+                                # Iterate vertices
                                 for vertex in polygon:
                                     if vertex in component_edges_vertices:
-                                        # 只取前两个值（有效坐标）
+                                        # Replace Y with aligned mean
                                         cleaned_vertex = (vertex[0], y_bar)
-                                        # 添加到清理后的多边形中
+                                        # Append updated vertex
                                         cleaned_polygon.append(cleaned_vertex)
                                     else:
-                                        # 只取前两个值（有效坐标）
+                                        # Keep original vertex
                                         cleaned_vertex = vertex
-                                        # 添加到清理后的多边形中
+                                        # Append unchanged vertex
                                         cleaned_polygon.append(cleaned_vertex)
-                                # 将清理后的多边形添加到新数据集中
+                                # Add updated polygon to new list
                                 cleaned_polygons_new.append(cleaned_polygon)
                             cleaned_polygons = cleaned_polygons_new
                     simple_cycles_test = cleaned_polygons

@@ -230,7 +230,7 @@ while step < total_steps:
             corners_val = corners_withsemantics_val[:, :, :2]
             semantics_val = corners_withsemantics_val[:, :, 2:]
             corners_val = corners_val + (torch.randn_like(corners_val, dtype=corners_val.dtype,
-                                                          device=corners_val.device) * 1 / 128)  # 标准高斯噪声 -> 和角点相同的归一化倍数对应标准差
+                                                          device=corners_val.device) * 1 / 128)  # Add standard Gaussian noise scaled (std=1/128) matching corner normalization
             global_attn_matrix_val = global_attn_matrix_val.to(device)
             corners_padding_mask_val = corners_padding_mask_val.to(device)
             edges_val = edges_val.to(device).type(torch.uint8)

@@ -3,10 +3,10 @@ import sys
 import cv2
 from PIL import Image, ImageDraw
 
-sys.path.insert(0, r'C:\Users\hmbashir\AI Training\GSDiff') # Modify it yourself
-sys.path.insert(0, r'C:\Users\hmbashir\AI Training\GSDiff\datasets') # Modify it yourself
-sys.path.insert(0, r'C:\Users\hmbashir\AI Training\GSDiff\gsdiff') # Modify it yourself
-sys.path.insert(0, r'C:\Users\hmbashir\AI Training\GSDiff\scripts\metrics') # Modify it yourself
+sys.path.insert(0, r'C:\Users\hmbashir\AI Training\GSDiff')  # Adjust to your local clone root if different
+sys.path.insert(0, r'C:\Users\hmbashir\AI Training\GSDiff\datasets')  # Adjust if dataset path changes
+sys.path.insert(0, r'C:\Users\hmbashir\AI Training\GSDiff\gsdiff')  # Core package path
+sys.path.insert(0, r'C:\Users\hmbashir\AI Training\GSDiff\scripts\metrics')  # Metrics utilities
 
 
 import math
@@ -30,20 +30,20 @@ from scripts.metrics.kid import kid
 if __name__ == '__main__':
     diffusion_steps = 1000
     batch_size_test = 3000
-    device = 'cuda:0' # Using CUDA-enabled PyTorch from virtual environment
-    merge_points = True # Must be set to True
-    align_points = True # Must be set to True
+    device = 'cuda:0'  # GPU device (set to 'cpu' if CUDA unavailable)
+    merge_points = True  # Required: downstream code assumes points are merged
+    align_points = True  # Required: enables geometric post-alignment for orthogonality
     aa_scale = 1
     resolution = 512
 
 
-    '''create output_dir'''
+    '''Create (or reset) the output directory'''
     output_dir = os.path.join('test_outputs', 'AP-1') + os.sep  # Keep trailing separator for consistency
     if os.path.exists(output_dir):
         shutil.rmtree(output_dir)
     os.makedirs(output_dir, exist_ok=True)
 
-    '''Diffusion Settings'''
+    '''Diffusion schedule construction (cosine beta schedule)'''
     # cosine beta
     alpha_bar = lambda t: math.cos((t) / 1.000 * math.pi / 2) ** 2
     betas = []
@@ -71,7 +71,7 @@ if __name__ == '__main__':
                 1.0 - alphas_cumprod)  # posterior distribution mean
 
 
-    '''Data'''
+    '''Dataset loading'''
     dataset_test = RPlanGEdgeSemanSimplified_81('test')
     dataloader_test = DataLoader(dataset_test, batch_size=batch_size_test, shuffle=False, num_workers=0,
                             drop_last=False, pin_memory=False)  # try different num_workers to be faster
@@ -83,7 +83,7 @@ if __name__ == '__main__':
     dataloader_test_iter_for_gt_rendering = iter(cycle(dataloader_test_for_gt_rendering))
 
 
-    '''In order to calculate such as FID and KID on the test set, the test set needs to be rendered first.'''
+    '''Render ground-truth samples to raster images (needed to compute FID/KID).'''
     gt_dir_test = os.path.join(output_dir, 'test_gt') + os.sep  # Keep trailing separator for consistency
     if os.path.exists(gt_dir_test):
         shutil.rmtree(gt_dir_test)
@@ -114,7 +114,7 @@ if __name__ == '__main__':
             edges_test_depadded = edges_test[global_attn_matrix_test.reshape(1, -1, 1)][None, :, None]
             edges_test_depadded = np.concatenate((1 - edges_test_depadded, edges_test_depadded), axis=2)
 
-            ''' get planar cycles'''
+            '''Derive planar cycles (simple polygons) and their semantic labels.'''
             # ndarray of shape (1, n, 14) containing 0s and 1s; find the index of each subarray where a 1 is located, and replace the original element with a value of 0 with 99999
             semantics_gt_i_transform_test = semantics_0_test_depadded
             semantics_gt_i_transform_indices_test = np.indices(semantics_gt_i_transform_test.shape)[-1]
@@ -220,7 +220,7 @@ if __name__ == '__main__':
 
                     t_test = torch.tensor([current_step_test] * 1, device=device)
 
-                    '''model: predicts corners_noise'''
+                    '''Model forward: predict noise for corner + semantic channels.'''
 
 
 
@@ -236,7 +236,7 @@ if __name__ == '__main__':
                 
                     output_corners_withsemantics_test_batch = torch.cat((output_corners_withsemantics1_test_batch, output_corners_withsemantics2_test_batch), dim=2)
 
-                    '''gaussian posterior'''
+                    '''Compute Gaussian posterior p(x_{t-1} | x_t, x_0) parameters.'''
                     model_variance_test_batch = torch.tensor(posterior_variance, device=device)[t_test][:, None,
                                                 None].expand_as(
                         corners_withsemantics_t_test_batch)
@@ -260,7 +260,7 @@ if __name__ == '__main__':
                     noise_test_batch = torch.randn_like(corners_withsemantics_t_test_batch)
                     sample_from_posterior_normal_distribution_test_batch = model_mean_test_batch + torch.sqrt(
                         model_variance_test_batch) * noise_test_batch
-                    '''record to visualize'''
+                    '''Record intermediate results for later visualization (selected timesteps).'''
                     if current_step_test in results_timesteps_stage1_test:
                         for i in range(corners_withsemantics_0_test_batch.shape[0]):
                             results_stage1_test['results_corners_' + str(current_step_test)].append(
@@ -270,7 +270,7 @@ if __name__ == '__main__':
                             results_stage1_test['results_corners_numbers_' + str(current_step_test)].append(
                                     sample_from_posterior_normal_distribution_test_batch[i, :, 9:10][None, :, :].view(-1))  # 0: True, 1: False
 
-            '''inverse normalize, remove padding and rasterization'''
+            '''Inverse normalization, remove padding and rasterize predicted corner sets.'''
             stage1_0_test = None
             for k_test in results_timesteps_stage1_test:
                 result_corners_inverse_normalized_test, result_semantics_inverse_normalized_test = \
@@ -297,9 +297,9 @@ if __name__ == '__main__':
                     # cv2.imwrite(os.path.join(corner_dir, f"{i}.png"), img)
                     node_count += len(result_corners_inverse_normalized_test[i][0])
                 node_count /= len(result_corners_inverse_normalized_test)
-                print(node_count) #
+                print(node_count)  # Average node (corner) count per sample
 
-            '''stage 2'''
+            '''Stage 2: edge (relationship) prediction using the trained edge transformer.'''
             # merge points (data loading in actual)
             corners_all_samples_test = stage1_0_test[0]
             semantics_all_samples_test = stage1_0_test[1]
@@ -341,7 +341,7 @@ if __name__ == '__main__':
                 results_stage2_test['results_corners_numbers_' + str(k_test)] = []
 
             for test_count in tqdm(range(len(dataset_test))):
-                '''a batch of data'''
+                '''Prepare a single-sample batch (normalized coordinates, masks, semantics).'''
                 corners_stage2_test = torch.zeros((1, 53, 2), dtype=torch.float64, device=device)
                 corners_temp_stage2_test = (torch.tensor(corners_all_samples_test[test_count], dtype=torch.float64,
                                                          device=device) - (resolution // 2)) / (resolution // 2)
@@ -358,20 +358,20 @@ if __name__ == '__main__':
                 corners_padding_mask_stage2_test = torch.zeros((1, 53, 1), dtype=torch.uint8, device=device)
                 corners_padding_mask_stage2_test[:, 0:corners_temp_stage2_test.shape[1], :] = 1
 
-                '''model: Edge transformer'''
+                '''Edge model forward pass (produces pairwise adjacency probabilities).'''
                 output_edges_test, _, _ = model_EdgeModel(corners_stage2_test, global_attn_matrix_stage2_test,
                                                     corners_padding_mask_stage2_test, semantics_stage2_test, feat_16_test_batch[test_count:test_count + 1, :, :])
                 output_edges_test = F.softmax(output_edges_test, dim=2)
                 output_edges_test = torch.argmax(output_edges_test, dim=2)
                 output_edges_test = F.one_hot(output_edges_test, num_classes=2)
 
-                '''record to visualize'''
+                '''Store edge predictions for this sample to enable later reconstruction.'''
                 results_stage2_test['results_corners_' + str(0)].append(corners_stage2_test)
                 results_stage2_test['results_edges_' + str(0)].append(output_edges_test)
                 results_stage2_test['results_corners_numbers_' + str(0)].append(
                     torch.sum(corners_padding_mask_stage2_test.view(-1)).item())
 
-            '''inverse normalize, remove padding and visualization'''
+            '''Remove padding from edge tensors and visualize reconstructed layouts.'''
             for k_test in [0]:
                 edges_all_samples_test = edges_remove_padding(results_stage2_test['results_edges_' + str(k_test)],
                                                               results_stage2_test['results_corners_numbers_' + str(k_test)])
@@ -387,7 +387,7 @@ if __name__ == '__main__':
                     edges_sample_i_test = edges_all_samples_test[test_count]
                     semantics_sample_i_test = semantics_all_samples_test[test_count]
 
-                    ''' get planar cycles'''
+                    '''Compute planar cycles (rooms) from predicted graph.'''
                     # ndarray of shape (1, n, 14) containing 0s and 1s; find the index of each subarray where a 1 is located, and replace the original element with a value of 0 with 99999
                     semantics_sample_i_transform_test = semantics_sample_i_test
                     semantics_sample_i_transform_indices_test = np.indices(semantics_sample_i_transform_test.shape)[-1]
@@ -407,7 +407,7 @@ if __name__ == '__main__':
                         output_edges_test)
                     # print(simple_cycles_test)
                     # print(simple_cycles_semantics_test)
-                    '''save vector results for statistical analysis'''
+                    '''Save vector-form intermediate results for later statistical analysis.'''
                     vr = {}
                     vr['output_points_test'] = output_points_test
                     vr['output_edges_test'] = output_edges_test
@@ -420,25 +420,25 @@ if __name__ == '__main__':
                 
                     if align_points:
                         align_threshold = round(resolution * 0.01)
-                        # First clean up the categories behind the coordinates
-                        # New polygon dataset, containing only meaningful coordinates
+                        # Clean semantic-augmented vertex tuples: retain only (x, y) for geometry ops
+                        # Build a fresh polygon list containing only coordinate pairs
                         cleaned_polygons = []
-                        # Iterate over each polygon
+                        # Iterate over each polygon's vertices
                         for polygon in simple_cycles_test:
                             cleaned_polygon = []
                             # Iterate through each vertex in the polygon
                             for vertex in polygon:
-                                # Only take the first two values ​​(valid coordinates)
+                                # Keep only the first two numeric values (x, y) — discard semantic indices
                                 cleaned_vertex = vertex[:2]
-                                # Add to the cleaned polygon
+                                # Append cleaned vertex
                                 cleaned_polygon.append(cleaned_vertex)
-                            # Add the cleaned polygons to the new dataset
+                            # Append cleaned polygon
                             cleaned_polygons.append(cleaned_polygon)
-                        # print('2', cleaned_polygons)
+                        # Debug: print(cleaned_polygons) if inspection needed
                         # x-align
                         for x_bond_left in range(0, resolution - align_threshold):
                             x_bond_right = x_bond_left + align_threshold
-                            # Get the edges that fall within this band
+                            # Collect edges whose endpoints both fall within the current x-band
                             edges_inbond = []
                             for cp in cleaned_polygons:
                                 for p_i, p in enumerate(cp):
@@ -449,39 +449,37 @@ if __name__ == '__main__':
                             # print('3', edges_inbond)
                     
                     
-                            # Group the edges by shared vertices
-                            # Create a new networkx graph
+                            # Group edges by shared vertices using an auxiliary graph
                             G_inbond = nx.Graph()
-                            # Add a node for each edge
+                            # Add each geometric edge as a node in the auxiliary graph
                             for edge_inbond in edges_inbond:
                                 G_inbond.add_node(edge_inbond)
-                            # Traverse each pair of edges and check if there is a shared vertex
+                            # Connect auxiliary nodes (edges) if they share an endpoint
                             for edge1 in edges_inbond:
                                 for edge2 in edges_inbond:
                                     if edge1 != edge2:
                                         # If two edges share a vertex, add an edge
                                         if set(edge1) & set(edge2):
                                             G_inbond.add_edge(edge1, edge2)
-                            # Find all connected components of a graph
+                            # Extract connected components = groups of collinear-ish vertical edges
                             connected_components_inbond = list(nx.connected_components(G_inbond))
-                            # print('4', connected_components_inbond)
+                            # Debug: print(connected_components_inbond)
                     
-                            # Convert each connected component to the set of edges it contains
+                            # Convert each component set to a plain list for iteration
                             grouped_edge_sets = [list(component) for component in connected_components_inbond]
                     
 
                             for i, component_edges in enumerate(grouped_edge_sets):
-                                # print(component_edges)
+                                # Component edges before alignment (optional debug)
                                 component_edges_vertices = []
                                 for component_edges_t in component_edges:
                                     for pnt in component_edges_t:
                                         component_edges_vertices.append(pnt)
                     
-                                # print(f"Connected Component {i}: {component_edges}")
-                                # Align x for each edge set, find the average (rounded) of x for each edge set, and then update the coordinates in cleaned_polygons
+                                # Compute representative x (rounded mean) and snap member vertices to that x
                                 x_bar = round(sum([(t[0][0] + t[1][0]) for t in component_edges]) / (2 * len(component_edges)))
                     
-                                # New polygon dataset, containing only meaningful coordinates
+                                # Rebuild polygons with updated (snapped) x positions
                                 cleaned_polygons_new = []
                                 # Iterate over each polygon
                                 for polygon in cleaned_polygons:
@@ -489,21 +487,21 @@ if __name__ == '__main__':
                                     # Iterate through each vertex in the polygon
                                     for vertex in polygon:
                                         if vertex in component_edges_vertices:
-                                            # Only take the first two values ​​(valid coordinates)
+                                            # Replace vertex with snapped x while preserving y
                                             cleaned_vertex = (x_bar, vertex[1])
-                                            # Add to the cleaned polygon
+                                            # Append updated vertex
                                             cleaned_polygon.append(cleaned_vertex)
                                         else:
-                                            # Only take the first two values ​​(valid coordinates)
+                                            # Vertex not in component; keep original position
                                             cleaned_vertex = vertex
-                                            # Add to the cleaned polygon
+                                            # Append untouched vertex
                                             cleaned_polygon.append(cleaned_vertex)
-                                    # Add the cleaned polygons to the new dataset
+                                    # Append rebuilt polygon
                                     cleaned_polygons_new.append(cleaned_polygon)
-                                    # print(cleaned_polygon)
+                                    # Debug: print(cleaned_polygon)
                                 cleaned_polygons = cleaned_polygons_new
                     
-                        # y-align
+                        # Repeat analogous snapping for y direction (horizontal edge alignment)
                         for y_bond_up in range(0, resolution - align_threshold):
                             y_bond_down = y_bond_up + align_threshold
                             edges_inbond = []
@@ -513,7 +511,7 @@ if __name__ == '__main__':
                                         e = (p, cp[p_i + 1])
                                         if y_bond_up <= e[0][1] <= y_bond_down and y_bond_up <= e[1][1] <= y_bond_down:
                                             edges_inbond.append(e)
-                            # print(edges_inbond)
+                            # Debug: print(edges_inbond)
                             G_inbond = nx.Graph()
                             for edge_inbond in edges_inbond:
                                 G_inbond.add_node(edge_inbond)
@@ -525,12 +523,12 @@ if __name__ == '__main__':
                             connected_components_inbond = list(nx.connected_components(G_inbond))
                             grouped_edge_sets = [list(component) for component in connected_components_inbond]
                             for i, component_edges in enumerate(grouped_edge_sets):
-                                # print(component_edges)
+                                # Optional debug: print(component_edges)
                                 component_edges_vertices = []
                                 for component_edges_t in component_edges:
                                     for pnt in component_edges_t:
                                         component_edges_vertices.append(pnt)
-                                # print(f"Connected Component {i}: {component_edges}")
+                                # Representative y for this component (rounded mean)
                                 y_bar = round(sum([(t[0][1] + t[1][1]) for t in component_edges]) / (2 * len(component_edges)))
                                 cleaned_polygons_new = []
                                 for polygon in cleaned_polygons:
@@ -544,14 +542,14 @@ if __name__ == '__main__':
                                             cleaned_polygon.append(cleaned_vertex)
                                     cleaned_polygons_new.append(cleaned_polygon)
                                 cleaned_polygons = cleaned_polygons_new
-                        simple_cycles_test = cleaned_polygons
+                        simple_cycles_test = cleaned_polygons  # Updated polygons after alignment
                     
 
 
 
 
                 
-                    # draw
+                    # Rasterize polygons to image
                     simple_cycles_test_aascale = []
                     for polygon_i, polygon in enumerate(simple_cycles_test):
                         polygon = [(p[0] * aa_scale, p[1] * aa_scale) for p in polygon]
@@ -574,9 +572,9 @@ if __name__ == '__main__':
                     # img = img.resize((512, 512), Image.ANTIALIAS)
                     img.save(os.path.join(output_dir_test, f"test_pred_{test_count}.png"))
 
-            '''calculate FID, KID. 
-            This rendering method is different, is in the validation set, and generates a different number of samples, which is not the reported result in the paper. 
-            The reported result in the paper is obtained by taking the 378 samples that overlap with WallPlan and Graph2Plan and calculating them once in the test script.'''
+            '''Compute FID and KID.
+            NOTE: This rendering pipeline (validation-style) produces a sample count differing from the paper.
+            The paper reports metrics on the 378 samples overlapping with WallPlan & Graph2Plan, evaluated once.'''
             current_Fid = fid(gt_dir_test, output_dir_test, fid_batch_size=128, fid_device=device)
             current_Kid = kid(gt_dir_test, output_dir_test, kid_batch_size=128, kid_device=device)
             print(model_path_CDDPM, 'FID: ', current_Fid, 'KID: ', current_Kid)
