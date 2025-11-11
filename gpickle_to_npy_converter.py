@@ -416,7 +416,12 @@ def convert_gpickle_to_npy(gpickle_path, output_path, max_corners=53,
 
     # Extract file ID
     if file_id is None:
-        file_id = int(Path(gpickle_path).stem)
+        # Try to extract integer from filename, otherwise use hash
+        try:
+            file_id = int(Path(gpickle_path).stem)
+        except ValueError:
+            # Use hash of filename for non-integer filenames
+            file_id = abs(hash(Path(gpickle_path).stem)) % (10**8)
 
     # Extract corners and edges
     corners_dict, corners_list, adjacency_list, adjacency_matrix, node_semantics, node_to_idx = \
@@ -534,12 +539,13 @@ def convert_directory(input_dir, output_dir, max_corners=53, semantic_dim=14,
     print(f"Found {len(gpickle_files)} .gpickle files")
 
     # Convert each file
-    stats = {'converted': 0, 'failed': 0, 'errors': []}
+    stats = {'converted': 0, 'failed': 0, 'errors': [], 'filename_mapping': {}}
 
-    for gpickle_path in tqdm(gpickle_files, desc="Converting files"):
+    for idx, gpickle_path in enumerate(tqdm(gpickle_files, desc="Converting files")):
         try:
-            # Determine output path
-            file_id = int(gpickle_path.stem)
+            # Use sequential numbering for file_id to ensure compatibility
+            # with GSDiff dataset loaders that expect 0.npy, 1.npy, etc.
+            file_id = idx
             output_name = f"{file_id}.npy"
 
             if train_val_test_split:
@@ -564,6 +570,9 @@ def convert_directory(input_dir, output_dir, max_corners=53, semantic_dim=14,
                 file_id=file_id
             )
 
+            # Track filename mapping
+            stats['filename_mapping'][str(gpickle_path.name)] = file_id
+
             stats['converted'] += 1
 
         except Exception as e:
@@ -580,6 +589,13 @@ def convert_directory(input_dir, output_dir, max_corners=53, semantic_dim=14,
         print(f"\nErrors:")
         for filename, error in stats['errors'][:10]:  # Show first 10 errors
             print(f"  - {filename}: {error}")
+
+    if stats['filename_mapping'] and stats['converted'] > 0:
+        print(f"\nFilename mapping (original → output):")
+        for orig_name, file_id in sorted(stats['filename_mapping'].items(), key=lambda x: x[1])[:10]:
+            print(f"  {orig_name} → {file_id}.npy")
+        if len(stats['filename_mapping']) > 10:
+            print(f"  ... and {len(stats['filename_mapping']) - 10} more")
 
     return stats
 

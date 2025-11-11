@@ -150,6 +150,8 @@ python gpickle_to_npy_converter.py \
 - `data/npy_files/2.npy`
 - ...
 
+**Note:** The script automatically handles any filename format (integer or non-integer). Files are converted to sequential numbering (0.npy, 1.npy, ...) to ensure compatibility with GSDiff dataset loaders. A filename mapping is displayed after conversion showing which original file corresponds to which output file.
+
 ### 2. Specify Coordinate Range
 
 If your coordinates are not in [0, 256] range:
