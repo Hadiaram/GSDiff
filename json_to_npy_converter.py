@@ -8,6 +8,7 @@ Supports multiple JSON formats:
 1. Node-edge format: {"nodes": [...], "edges": [...]}
 2. Corners-adjacency format: {"corners": [...], "adjacency": [...]}
 3. Room-based format: {"rooms": [{corners: [...], type: ...}]}
+4. BIM format: {"rooms": [...], "walls": [...]} - Revit/BIM exports
 
 Usage:
     python json_to_npy_converter.py --input_dir data/json_files --output_dir data/npy_files
@@ -21,6 +22,7 @@ from pathlib import Path
 from tqdm import tqdm
 import warnings
 from typing import Dict, List, Tuple, Any, Optional
+from collections import defaultdict
 
 
 # ============================================================================
@@ -35,16 +37,175 @@ def detect_json_format(data: Dict) -> str:
         data: Parsed JSON dictionary
 
     Returns:
-        Format type: 'node-edge', 'corners-adjacency', 'rooms', or 'unknown'
+        Format type: 'node-edge', 'corners-adjacency', 'rooms', 'bim', or 'unknown'
     """
     if 'nodes' in data and 'edges' in data:
         return 'node-edge'
     elif 'corners' in data and ('adjacency' in data or 'adjacency_list' in data or 'adjacency_matrix' in data):
         return 'corners-adjacency'
+    elif 'rooms' in data and 'walls' in data:
+        # BIM format: rooms reference walls by ID, walls have coordinates
+        return 'bim'
     elif 'rooms' in data:
         return 'rooms'
     else:
         return 'unknown'
+
+
+def parse_bim_format(data: Dict) -> Tuple[List[Tuple[float, float]], List[Tuple[int, int]], Dict[int, int]]:
+    """
+    Parse BIM format JSON (Revit, ArchiCAD, etc.).
+
+    Format:
+    {
+        "rooms": [
+            {
+                "bounding_box": {"min": [x, y, z], "max": [x, y, z]},
+                "walls": [wall_id1, wall_id2, ...],
+                "name": "LIVING ROOM",
+                "id": 12345
+            },
+            ...
+        ],
+        "walls": [
+            {
+                "start": [x, y, z],
+                "end": [x, y, z],
+                "id": wall_id
+            },
+            ...
+        ]
+    }
+
+    Returns:
+        corners_list: List of (x, y) tuples
+        edges_list: List of (node1, node2) tuples
+        semantics: Dict mapping node index to semantic label
+    """
+    
+    # Room type mapping
+    room_type_map = {
+        'living': 0, 'living_room': 0, 'dining': 0, 'entrance': 0, 'foyer': 0,
+        'master_bedroom': 1, 'bedroom': 1,
+        'kitchen': 2,
+        'bathroom': 3, 'bath': 3, 'powder': 3,
+        'dining_room': 4,
+        'child_room': 5,
+        'study_room': 6, 'study': 6,
+        'second_bedroom': 7,
+        'guest_room': 8,
+        'balcony': 9,
+        'entrance_hall': 10,
+        'storage': 11, 'storeroom': 11,
+        'closet': 12, 'walk_in': 12, 'dressing': 12,
+        'external': 13, 'outside': 13,
+    }
+    
+    # Build wall ID to geometry mapping
+    wall_dict = {}
+    for wall in data['walls']:
+        wall_id = wall['id']
+        # Extract 2D coordinates (ignore Z)
+        start = (wall['start'][0], wall['start'][1])
+        end = (wall['end'][0], wall['end'][1])
+        wall_dict[wall_id] = {'start': start, 'end': end}
+    
+    # Process each room
+    corners_list = []
+    edges_list = []
+    semantics = {}
+    corner_to_idx = {}
+    
+    def get_or_create_corner(coord: Tuple[float, float], room_type: int) -> int:
+        """Get existing corner index or create new one"""
+        # Round to avoid floating point issues
+        rounded = (round(coord[0], 6), round(coord[1], 6))
+        if rounded in corner_to_idx:
+            return corner_to_idx[rounded]
+        else:
+            idx = len(corners_list)
+            corners_list.append(coord)
+            corner_to_idx[rounded] = idx
+            semantics[idx] = room_type
+            return idx
+    
+    for room in data['rooms']:
+        # Get room type
+        room_name = room.get('name', '').lower()
+        room_type = 0  # default to living room
+        
+        for keyword, type_id in room_type_map.items():
+            if keyword in room_name:
+                room_type = type_id
+                break
+        
+        # Get walls for this room
+        room_wall_ids = room.get('walls', [])
+        if not room_wall_ids:
+            # Skip rooms with no walls (like balconies)
+            continue
+        
+        # Collect all endpoints from room's walls
+        room_corners = []
+        room_wall_segments = []
+        
+        for wall_id in room_wall_ids:
+            if wall_id in wall_dict:
+                wall_geom = wall_dict[wall_id]
+                room_wall_segments.append((wall_geom['start'], wall_geom['end']))
+        
+        if not room_wall_segments:
+            continue
+        
+        # Build a graph of wall connections to find the room boundary
+        endpoint_connections = defaultdict(list)
+        for start, end in room_wall_segments:
+            # Round coordinates for matching
+            start_rounded = (round(start[0], 4), round(start[1], 4))
+            end_rounded = (round(end[0], 4), round(end[1], 4))
+            endpoint_connections[start_rounded].append(end_rounded)
+            endpoint_connections[end_rounded].append(start_rounded)
+        
+        # Find a closed loop of corners
+        if endpoint_connections:
+            # Start from any point
+            start_point = list(endpoint_connections.keys())[0]
+            ordered_corners = [start_point]
+            current = start_point
+            visited = {start_point}
+            
+            # Trace the boundary
+            while True:
+                neighbors = [n for n in endpoint_connections[current] if n not in visited]
+                if not neighbors:
+                    break
+                next_point = neighbors[0]
+                ordered_corners.append(next_point)
+                visited.add(next_point)
+                current = next_point
+                
+                # Stop if we've closed the loop
+                if len(ordered_corners) > 2 and current in endpoint_connections[start_point]:
+                    break
+                
+                # Prevent infinite loops
+                if len(ordered_corners) > 100:
+                    break
+            
+            # Create corners and edges
+            room_corner_indices = []
+            for corner in ordered_corners:
+                # Convert back to original precision
+                corner_coord = corner
+                idx = get_or_create_corner(corner_coord, room_type)
+                room_corner_indices.append(idx)
+            
+            # Add edges forming the room boundary
+            for i in range(len(room_corner_indices)):
+                edge = (room_corner_indices[i], room_corner_indices[(i + 1) % len(room_corner_indices)])
+                edges_list.append(edge)
+    
+    return corners_list, edges_list, semantics
 
 
 def parse_node_edge_format(data: Dict) -> Tuple[List[Tuple[float, float]], List[Tuple[int, int]], Dict[int, int]]:
@@ -324,6 +485,8 @@ def load_json_graph(json_path: str) -> Tuple[List[Tuple[float, float]], List[Tup
         return parse_node_edge_format(data)
     elif format_type == 'corners-adjacency':
         return parse_corners_adjacency_format(data)
+    elif format_type == 'bim':
+        return parse_bim_format(data)
     elif format_type == 'rooms':
         return parse_rooms_format(data)
     else:
@@ -332,6 +495,7 @@ def load_json_graph(json_path: str) -> Tuple[List[Tuple[float, float]], List[Tup
             f"1. Node-edge: {{'nodes': [...], 'edges': [...]}}\n"
             f"2. Corners-adjacency: {{'corners': [...], 'adjacency': [...]}}\n"
             f"3. Rooms: {{'rooms': [...]}}\\n"
+            f"4. BIM: {{'rooms': [...], 'walls': [...]}}\n"
             f"See documentation for details."
         )
 
@@ -347,16 +511,26 @@ def normalize_coordinates(corners_list: List[Tuple[float, float]],
 
     Args:
         corners_list: List of (x, y) coordinate tuples
-        coord_range: Expected range of input coordinates (min, max)
+        coord_range: Expected range of input coordinates (min, max) or 'auto'
 
     Returns:
         Normalized coordinates as numpy array (n, 2)
     """
     corners_np = np.array(corners_list, dtype=np.float64)
 
-    min_val, max_val = coord_range
-    center = (min_val + max_val) / 2.0
-    scale = (max_val - min_val) / 2.0
+    if coord_range == 'auto' or coord_range is None:
+        # Auto-detect range from data
+        min_coords = corners_np.min(axis=0)
+        max_coords = corners_np.max(axis=0)
+        center = (min_coords + max_coords) / 2.0
+        scale = (max_coords - min_coords).max() / 2.0
+    else:
+        min_val, max_val = coord_range
+        center = (min_val + max_val) / 2.0
+        scale = (max_val - min_val) / 2.0
+
+    if scale == 0:
+        scale = 1.0  # Avoid division by zero
 
     normalized = (corners_np - center) / scale
 
@@ -550,7 +724,7 @@ def convert_json_to_npy(json_path: str,
         output_path: Path to output .npy file
         max_corners: Maximum number of corners (default: 53)
         semantic_dim: Number of semantic dimensions (default: 14)
-        coord_range: Expected coordinate range (min, max)
+        coord_range: Expected coordinate range (min, max) or 'auto'
         file_id: Optional file ID (extracted from filename if None)
 
     Returns:
@@ -565,8 +739,8 @@ def convert_json_to_npy(json_path: str,
     # Extract file ID
     if file_id is None:
         try:
-            file_id = int(Path(json_path).stem)
-        except ValueError:
+            file_id = int(Path(json_path).stem.split('_')[-1])
+        except (ValueError, IndexError):
             file_id = abs(hash(Path(json_path).stem)) % (10**8)
 
     # Normalize coordinates
@@ -641,7 +815,7 @@ def convert_directory(input_dir: str,
         output_dir: Output directory for .npy files
         max_corners: Maximum number of corners
         semantic_dim: Number of semantic dimensions
-        coord_range: Expected coordinate range
+        coord_range: Expected coordinate range or 'auto'
         train_val_test_split: Optional dict with 'train', 'val', 'test' lists
 
     Returns:
@@ -706,6 +880,8 @@ def convert_directory(input_dir: str,
             stats['failed'] += 1
             stats['errors'].append((json_path.name, str(e)))
             print(f"\nError converting {json_path.name}: {e}")
+            import traceback
+            traceback.print_exc()
 
     print(f"\n{'='*60}")
     print(f"Conversion complete!")
@@ -773,12 +949,18 @@ Supported JSON Formats:
        ]
    }
 
+4. BIM Format (Revit/ArchiCAD):
+   {
+       "rooms": [...],
+       "walls": [{"id": 123, "start": [x,y,z], "end": [x,y,z]}, ...]
+   }
+
 Examples:
-    # Convert directory
-    python json_to_npy_converter.py --input_dir data/json_files --output_dir data/npy_files
+    # Convert directory (auto-detect coordinate range)
+    python json_to_npy_converter.py --input_dir data/json_files --output_dir data/npy_files --coord_range auto
 
     # Convert single file
-    python json_to_npy_converter.py --input data/floor_plan.json --output data/floor_plan.npy
+    python json_to_npy_converter.py --input data/floor_plan.json --output data/floor_plan.npy --coord_range auto
 
     # Specify coordinate range
     python json_to_npy_converter.py --input_dir data/json --output_dir data/npy --coord_range 0 1000
@@ -798,9 +980,9 @@ Examples:
                        help='Maximum number of corners (default: 53)')
     parser.add_argument('--semantic_dim', type=int, default=14,
                        help='Number of semantic dimensions (default: 14)')
-    parser.add_argument('--coord_range', type=float, nargs=2, default=[0, 256],
-                       metavar=('MIN', 'MAX'),
-                       help='Expected coordinate range (default: 0 256)')
+    parser.add_argument('--coord_range', nargs='*', default=['auto'],
+                       metavar='MIN MAX',
+                       help='Expected coordinate range: "auto" or "MIN MAX" (default: auto)')
     parser.add_argument('--split_file', type=str,
                        help='JSON file with train/val/test split')
 
@@ -812,7 +994,16 @@ Examples:
     if args.input_dir and not args.output_dir:
         parser.error("--output_dir is required when using --input_dir")
 
-    coord_range = tuple(args.coord_range)
+    # Parse coord_range
+    if args.coord_range == ['auto'] or args.coord_range[0] == 'auto':
+        coord_range = 'auto'
+    else:
+        try:
+            coord_range = tuple(float(x) for x in args.coord_range)
+            if len(coord_range) != 2:
+                parser.error("--coord_range must be 'auto' or two numbers")
+        except ValueError:
+            parser.error("--coord_range values must be numbers or 'auto'")
 
     # Load split file if provided
     train_val_test_split = None
