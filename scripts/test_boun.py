@@ -30,7 +30,7 @@ from scripts.metrics.kid import kid
 if __name__ == '__main__':
     diffusion_steps = 1000
     batch_size_test = 3000
-    device = 'cuda:0' # Using CUDA-enabled PyTorch from virtual environment
+    device = 'cpu'  # Changed to CPU since CUDA is not available
     merge_points = True # Must be set to True
     align_points = True # Must be set to True
     aa_scale = 1
