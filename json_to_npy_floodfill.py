@@ -239,11 +239,9 @@ def create_wall_raster(walls, resolution=10.0, wall_thickness=2):
             continue
         
         # Try extending from endpoints
-        for start_point, direction in [(px2, py2, 1), (px1, py1, -1)]:
+        for px_start, py_start, direction in [(px2, py2, 1), (px1, py1, -1)]:
             hit_wall = False
             hit_x, hit_y = None, None
-            
-            px_start, py_start = start_point
             
             for distance in range(10, int(extension_range_px)):
                 test_x = int(px_start + direction * dx_norm * distance)
