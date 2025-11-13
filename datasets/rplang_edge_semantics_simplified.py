@@ -47,13 +47,33 @@ class RPlanGEdgeSemanSimplified(Dataset):
           return all unbatched things in ndarray in a dict'''
 
         if self.mode == 'train':
-            graph = np.load(get_data_path('rplang-v3-withsemantics', 'train', self.files[index]), allow_pickle=True).item()
+            data = np.load(get_data_path('rplang-v3-withsemantics', 'train', self.files[index]), allow_pickle=True)
         elif self.mode == 'val':
-            graph = np.load(get_data_path('rplang-v3-withsemantics', 'val', self.files[index]), allow_pickle=True).item()
+            data = np.load(get_data_path('rplang-v3-withsemantics', 'val', self.files[index]), allow_pickle=True)
         elif self.mode == 'test':
-            graph = np.load(get_data_path('rplang-v3-withsemantics', 'test', self.files[index]), allow_pickle=True).item()
+            data = np.load(get_data_path('rplang-v3-withsemantics', 'test', self.files[index]), allow_pickle=True)
         else:
             assert 0, 'mode error'
+
+        # Handle different numpy array formats
+        if isinstance(data, np.ndarray):
+            if data.ndim == 0:
+                # 0-dimensional array containing an object (expected format)
+                graph = data.item()
+            elif data.size == 1:
+                # Array with single element
+                graph = data.flatten()[0]
+            else:
+                # If it's already a dict/object at the numpy level, use it directly
+                if isinstance(data, dict):
+                    graph = data
+                else:
+                    raise ValueError(f"Unexpected numpy array format: shape={data.shape}, dtype={data.dtype}, size={data.size}")
+        elif isinstance(data, dict):
+            # Already a dict (shouldn't happen with np.load but handle it)
+            graph = data
+        else:
+            raise ValueError(f"Unexpected data type from np.load: {type(data)}")
 
         '''coords_withsemantics, (53, 16)'''
         corners_withsemantics = graph['corner_list_np_normalized_padding_withsemantics']
