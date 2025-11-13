@@ -10,6 +10,33 @@ ERROR: Loaded numpy file contains a raw array instead of a dictionary.
 
 This means your numpy files are in the **wrong format**. You're saving raw arrays (like images or masks) instead of the required dictionary structure.
 
+## Quick Solution: Raster-to-Graph Converter
+
+**If you have flood-filled raster NPY files (2D arrays with room IDs), use the automated converter:**
+
+```bash
+python raster_to_graph_converter.py \
+    --input_dir path/to/your/raster_npys \
+    --output_dir datasets/rplang-v3-withsemantics/test \
+    --image_size 2575 \  # Your raster dimensions
+    --validate
+```
+
+**See [RASTER_TO_GRAPH_GUIDE.md](RASTER_TO_GRAPH_GUIDE.md) for detailed instructions.**
+
+The converter automatically:
+- ✅ Extracts room boundaries from raster data
+- ✅ Builds graph structure (corners, edges, adjacency)
+- ✅ Adds semantic information
+- ✅ Normalizes and pads to GSDiff format
+- ✅ Validates output
+
+---
+
+## Manual Approach: Understanding the Format
+
+If you're creating a custom converter or need to understand the exact format:
+
 ## Required Data Format
 
 Each `.npy` file must contain a **Python dictionary** (not a raw numpy array) with the following structure:
