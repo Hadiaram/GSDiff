@@ -30,7 +30,7 @@ from scripts.metrics.kid import kid
 if __name__ == '__main__':
     diffusion_steps = 1000
     batch_size_test = 3000
-    device = 'cpu'  # Changed to CPU since CUDA is not available
+    device = 'cuda:0' # Using CUDA-enabled PyTorch from virtual environment
     merge_points = True # Must be set to True
     align_points = True # Must be set to True
     aa_scale = 1
@@ -578,9 +578,16 @@ if __name__ == '__main__':
             This rendering method is different, is in the validation set, and generates a different number of samples, which is not the reported result in the paper. 
             The reported result in the paper is obtained by taking the 378 samples that overlap with WallPlan and Graph2Plan and calculating them once in the test script.'''
             current_Fid = fid(gt_dir_test, output_dir_test, fid_batch_size=128, fid_device=device)
-            current_Kid = kid(gt_dir_test, output_dir_test, kid_batch_size=128, kid_device=device)
-            print(model_path_CDDPM, 'FID: ', current_Fid, 'KID: ', current_Kid)
+            
+            # KID requires at least 3 samples to avoid division by zero
+            if len(dataset_test) >= 3:
+                current_Kid = kid(gt_dir_test, output_dir_test, kid_batch_size=128, kid_device=device)
+                print(model_path_CDDPM, 'FID: ', current_Fid, 'KID: ', current_Kid)
+                test_metrics.append([model_path_CDDPM, current_Fid, current_Kid])
+            else:
+                print(f'⚠️  Skipping KID calculation - requires at least 3 samples, but only have {len(dataset_test)}')
+                print(model_path_CDDPM, 'FID: ', current_Fid)
+                test_metrics.append([model_path_CDDPM, current_Fid, None])
 
             '''saving Acc'''
-            test_metrics.append([model_path_CDDPM, current_Fid, current_Kid])
             np.save(output_dir + 'test_metrics.npy', np.array(test_metrics))

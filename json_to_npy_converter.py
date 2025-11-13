@@ -157,47 +157,31 @@ def parse_bim_format(data: Dict) -> Tuple[List[Tuple[float, float]], List[Tuple[
         if not room_wall_segments:
             continue
         
-        # Build a graph of wall connections to find the room boundary
-        endpoint_connections = defaultdict(list)
+        # Collect all unique corners from wall segments
+        all_corners = set()
         for start, end in room_wall_segments:
-            # Round coordinates for matching
-            start_rounded = (round(start[0], 4), round(start[1], 4))
-            end_rounded = (round(end[0], 4), round(end[1], 4))
-            endpoint_connections[start_rounded].append(end_rounded)
-            endpoint_connections[end_rounded].append(start_rounded)
+            # Round coordinates for matching (higher precision)
+            start_rounded = (round(start[0], 6), round(start[1], 6))
+            end_rounded = (round(end[0], 6), round(end[1], 6))
+            all_corners.add(start_rounded)
+            all_corners.add(end_rounded)
         
-        # Find a closed loop of corners
-        if endpoint_connections:
-            # Start from any point
-            start_point = list(endpoint_connections.keys())[0]
-            ordered_corners = [start_point]
-            current = start_point
-            visited = {start_point}
+        ordered_corners = list(all_corners)
+        
+        # Sort corners to form a polygon (by angle from centroid)
+        if len(ordered_corners) >= 3:
+            corners_array = np.array(ordered_corners)
+            centroid = corners_array.mean(axis=0)
             
-            # Trace the boundary
-            while True:
-                neighbors = [n for n in endpoint_connections[current] if n not in visited]
-                if not neighbors:
-                    break
-                next_point = neighbors[0]
-                ordered_corners.append(next_point)
-                visited.add(next_point)
-                current = next_point
-                
-                # Stop if we've closed the loop
-                if len(ordered_corners) > 2 and current in endpoint_connections[start_point]:
-                    break
-                
-                # Prevent infinite loops
-                if len(ordered_corners) > 100:
-                    break
+            def angle_from_centroid(point):
+                return np.arctan2(point[1] - centroid[1], point[0] - centroid[0])
+            
+            ordered_corners = sorted(ordered_corners, key=angle_from_centroid)
             
             # Create corners and edges
             room_corner_indices = []
             for corner in ordered_corners:
-                # Convert back to original precision
-                corner_coord = corner
-                idx = get_or_create_corner(corner_coord, room_type)
+                idx = get_or_create_corner(corner, room_type)
                 room_corner_indices.append(idx)
             
             # Add edges forming the room boundary
@@ -567,6 +551,101 @@ def create_adjacency_structures(n_corners: int, edges_list: List[Tuple[int, int]
     return adjacency_matrix, adjacency_list
 
 
+def reduce_corners(corners: np.ndarray, 
+                   adjacency_matrix: List[List[int]], 
+                   max_corners: int = 53,
+                   merge_threshold: float = 0.02,
+                   semantic_dict: Optional[Dict] = None) -> Tuple[np.ndarray, List[List[int]], Optional[Dict]]:
+    """
+    Reduce the number of corners by merging nearby corners.
+    
+    Args:
+        corners: Corner coordinates (n, 2) - already normalized to [-1, 1]
+        adjacency_matrix: Adjacency matrix (n, n)
+        max_corners: Maximum allowed corners
+        merge_threshold: Distance threshold for merging (in normalized coords)
+        semantic_dict: Optional dict mapping corner tuples to semantic vectors
+    
+    Returns:
+        reduced_corners: Reduced corner coordinates
+        reduced_adjacency: Updated adjacency matrix
+        reduced_semantic_dict: Updated semantic dict (if provided)
+    """
+    n = len(corners)
+    
+    if n <= max_corners:
+        return corners, adjacency_matrix
+    
+    print(f"⚠️  Floor plan has {n} corners, reducing to {max_corners}...")
+    
+    # Convert to numpy for easier manipulation
+    corners_array = np.array(corners)
+    adj_matrix = np.array(adjacency_matrix, dtype=np.int32)
+    
+    # Keep track of which corners to keep
+    keep_indices = list(range(n))
+    merge_map = {}  # Maps old index to new index
+    
+    # Iteratively merge closest corners until we're under the limit
+    while len(keep_indices) > max_corners:
+        # Find the closest pair of corners
+        min_dist = float('inf')
+        merge_i, merge_j = -1, -1
+        
+        for i in range(len(keep_indices) - 1):
+            for j in range(i + 1, len(keep_indices)):
+                idx_i = keep_indices[i]
+                idx_j = keep_indices[j]
+                dist = np.linalg.norm(corners_array[idx_i] - corners_array[idx_j])
+                if dist < min_dist:
+                    min_dist = dist
+                    merge_i, merge_j = i, j
+        
+        # Merge the two closest corners
+        idx_i = keep_indices[merge_i]
+        idx_j = keep_indices[merge_j]
+        
+        # Average the positions
+        corners_array[idx_i] = (corners_array[idx_i] + corners_array[idx_j]) / 2.0
+        
+        # Merge adjacency: connect idx_i to everything idx_j was connected to
+        adj_matrix[idx_i, :] = np.maximum(adj_matrix[idx_i, :], adj_matrix[idx_j, :])
+        adj_matrix[:, idx_i] = np.maximum(adj_matrix[:, idx_i], adj_matrix[:, idx_j])
+        adj_matrix[idx_i, idx_i] = 0  # No self-loops
+        
+        # Record the merge and remove idx_j
+        merge_map[idx_j] = idx_i
+        keep_indices.pop(merge_j)
+    
+    # Extract the reduced corners and adjacency matrix
+    reduced_corners = corners_array[keep_indices]
+    reduced_adj = adj_matrix[np.ix_(keep_indices, keep_indices)]
+    
+    # Update semantic dict if provided
+    reduced_semantic_dict = None
+    if semantic_dict is not None:
+        reduced_semantic_dict = {}
+        # Convert old semantic dict keys to list for indexed access
+        old_corners_list = list(semantic_dict.keys())
+        
+        for new_idx, old_idx in enumerate(keep_indices):
+            # Get semantic vector from the old corner at old_idx
+            if old_idx < len(old_corners_list):
+                old_corner = old_corners_list[old_idx]
+                sem_vec = semantic_dict[old_corner]
+            else:
+                # Default semantics if index out of range
+                sem_vec = [1] + [0] * 13  # Default: boundary
+            
+            # Map the reduced corner position to the semantic vector
+            new_corner_tuple = tuple(reduced_corners[new_idx])
+            reduced_semantic_dict[new_corner_tuple] = sem_vec
+    
+    print(f"✓ Reduced from {n} to {len(reduced_corners)} corners")
+    
+    return reduced_corners, reduced_adj.tolist(), reduced_semantic_dict
+
+
 def create_padded_arrays(corner_list_np_normalized: np.ndarray,
                         adjacency_matrix: List[List[int]],
                         max_corners: int = 53) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -587,7 +666,8 @@ def create_padded_arrays(corner_list_np_normalized: np.ndarray,
     n = len(corner_list_np_normalized)
 
     if n > max_corners:
-        raise ValueError(f"Graph has {n} corners, which exceeds max_corners={max_corners}")
+        raise ValueError(f"Graph has {n} corners, which exceeds max_corners={max_corners}. "
+                        "Call reduce_corners before this function.")
 
     # Padded corners
     corner_list_np_normalized_padding = np.zeros((max_corners, 2), dtype=np.float64)
@@ -754,7 +834,16 @@ def convert_json_to_npy(json_path: str,
     # Create semantic vectors
     semantic_dict = create_semantic_vectors(corners_list, semantics, semantic_dim)
 
-    # Create padded arrays
+    # Reduce corners if necessary BEFORE padding
+    if len(corner_list_np_normalized) > max_corners:
+        corner_list_np_normalized, adjacency_matrix, semantic_dict = reduce_corners(
+            corner_list_np_normalized, adjacency_matrix, max_corners, semantic_dict=semantic_dict
+        )
+        # Update corners_list to match reduced corners
+        corners_list = [tuple(c) for c in corner_list_np_normalized]
+        n_corners = len(corners_list)
+
+    # Create padded arrays (no reduction happens here now)
     (corner_list_np_normalized_padding, padding_mask,
      global_matrix_np_padding, adjacency_matrix_np_padding) = create_padded_arrays(
         corner_list_np_normalized, adjacency_matrix, max_corners
