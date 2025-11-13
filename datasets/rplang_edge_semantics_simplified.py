@@ -64,11 +64,22 @@ class RPlanGEdgeSemanSimplified(Dataset):
                 # Array with single element
                 graph = data.flatten()[0]
             else:
-                # If it's already a dict/object at the numpy level, use it directly
-                if isinstance(data, dict):
-                    graph = data
-                else:
-                    raise ValueError(f"Unexpected numpy array format: shape={data.shape}, dtype={data.dtype}, size={data.size}")
+                # Large array detected - likely wrong format
+                raise ValueError(
+                    f"ERROR: Loaded numpy file contains a raw array instead of a dictionary.\n"
+                    f"  File: {self.files[index]}\n"
+                    f"  Array shape: {data.shape}, dtype: {data.dtype}, size: {data.size}\n\n"
+                    f"Expected format: A dictionary containing these keys:\n"
+                    f"  - 'corner_list_np_normalized_padding_withsemantics': array of shape (53, 16)\n"
+                    f"  - 'padding_mask': array of shape (53, 1)\n"
+                    f"  - 'global_matrix_np_padding': array of shape (53, 53)\n"
+                    f"  - 'edges': edge adjacency data\n\n"
+                    f"How to fix:\n"
+                    f"  1. Your data conversion script should save a DICTIONARY, not a raw array\n"
+                    f"  2. Use: np.save(filepath, your_dict) where your_dict contains all required keys\n"
+                    f"  3. See datasets/rplan-process4.py lines 1072-1079 for an example\n"
+                    f"  4. Or create a DATA_FORMAT_GUIDE.md for detailed instructions"
+                )
         elif isinstance(data, dict):
             # Already a dict (shouldn't happen with np.load but handle it)
             graph = data
