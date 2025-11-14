@@ -69,8 +69,63 @@ Topics covered:
 
 ## 🛠️ Tools
 
+### [json_to_npy_floodfill.py](json_to_npy_floodfill.py)
+**Convert BIM JSON files to raster NPY format (Step 1 of pipeline)**
+
+**Features:**
+- Converts JSON floor plans (BIM format) to raster arrays
+- Uses flood fill algorithm for proper room boundaries
+- Handles walls, doors, and room separation
+- Configurable resolution and wall thickness
+- Creates visualization PNGs for verification
+
+**Quick Example:**
+
+```bash
+# Convert single JSON file
+python json_to_npy_floodfill.py \
+    --input apartment_1.json \
+    --output apartment_1.npy \
+    --resolution 10.0
+
+# Batch convert directory
+python json_to_npy_floodfill.py \
+    --input_dir JSON_files \
+    --output_dir raster_npy_files
+```
+
+**Output:** Raster NPY files (2D arrays where each pixel = room ID)
+
+---
+
+### [raster_to_graph_converter.py](raster_to_graph_converter.py)
+**Convert raster NPY to graph NPY format (Step 2 of pipeline)**
+
+**Features:**
+- Converts raster arrays to GSDiff graph format
+- Extracts corners using OpenCV contour detection
+- Builds adjacency matrices automatically
+- Normalizes coordinates to [-1, 1] range
+- Pads to 53 corners (or custom size)
+- Validates output format
+
+**Quick Example:**
+
+```bash
+# Convert raster NPY files to graph format
+python raster_to_graph_converter.py \
+    --input_dir raster_npy_files \
+    --output_dir datasets/my-custom-floorplans/train \
+    --image_size 2575 \
+    --validate
+```
+
+**Critical:** Must specify `--image_size` matching your raster dimensions!
+
+---
+
 ### [augment_floor_plans.py](augment_floor_plans.py)
-**Geometric data augmentation script**
+**Geometric data augmentation script (Step 3 of pipeline)**
 
 **Features:**
 - Increase dataset by 4× (flips) or 8× (flips + rotations)
@@ -184,7 +239,9 @@ python scripts/trainval_main_unconstrained.py
 | `PRE_AUGMENTATION_WORKFLOW.md` | Documentation | ⭐ Recommended workflow for custom data | 15KB |
 | `TRAINING_GUIDE.md` | Documentation | Complete training reference | 35KB |
 | `DATA_AUGMENTATION_GUIDE.md` | Documentation | Technical augmentation reference | 17KB |
-| `augment_floor_plans.py` | Script | Data augmentation tool | 14KB |
+| `json_to_npy_floodfill.py` | Script | JSON → Raster NPY converter | 17KB |
+| `raster_to_graph_converter.py` | Script | Raster NPY → Graph NPY converter | 16KB |
+| `augment_floor_plans.py` | Script | Graph NPY augmentation tool | 14KB |
 
 ---
 
