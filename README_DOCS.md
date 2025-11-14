@@ -4,7 +4,29 @@ This branch contains comprehensive documentation and tools for training and augm
 
 ## 📚 Documentation
 
-### 1. [TRAINING_GUIDE.md](TRAINING_GUIDE.md)
+### 1. [PRE_AUGMENTATION_WORKFLOW.md](PRE_AUGMENTATION_WORKFLOW.md) ⭐ RECOMMENDED
+**Step-by-step workflow for preparing custom data**
+
+**This is the guide you need if you're augmenting BEFORE placing data in the repo!**
+
+Topics covered:
+- **Complete workflow** - Convert → Augment → Place in repo → Train
+- **Step-by-step process** - 6 clear steps with copy-paste commands
+- **File naming** - How to handle augmented filenames
+- **Dataset splitting** - Train/val/test organization
+- **Best practices** - What to augment, what to keep original
+- **Automated scripts** - Python script for splitting dataset
+- **Quick reference** - All commands in one place
+
+**Use this when:**
+- Preparing custom floor plan data for training
+- You want to augment BEFORE adding to repository
+- You need a simple, streamlined workflow
+- You're new to the augmentation process
+
+---
+
+### 2. [TRAINING_GUIDE.md](TRAINING_GUIDE.md)
 **Complete training documentation (1,150 lines)**
 
 Topics covered:
@@ -25,8 +47,8 @@ Topics covered:
 
 ---
 
-### 2. [DATA_AUGMENTATION_GUIDE.md](DATA_AUGMENTATION_GUIDE.md)
-**Data augmentation documentation (1,000+ lines)**
+### 3. [DATA_AUGMENTATION_GUIDE.md](DATA_AUGMENTATION_GUIDE.md)
+**Data augmentation documentation (1,000+ lines) - Technical reference**
 
 Topics covered:
 - **Quick Start Examples** - Get started in minutes
@@ -158,8 +180,10 @@ python scripts/trainval_main_unconstrained.py
 
 | File | Type | Purpose | Size |
 |------|------|---------|------|
+| `README_DOCS.md` | Documentation | Master index (this file) | 10KB |
+| `PRE_AUGMENTATION_WORKFLOW.md` | Documentation | ⭐ Recommended workflow for custom data | 15KB |
 | `TRAINING_GUIDE.md` | Documentation | Complete training reference | 35KB |
-| `DATA_AUGMENTATION_GUIDE.md` | Documentation | Augmentation guide | 17KB |
+| `DATA_AUGMENTATION_GUIDE.md` | Documentation | Technical augmentation reference | 17KB |
 | `augment_floor_plans.py` | Script | Data augmentation tool | 14KB |
 
 ---

@@ -1,5 +1,9 @@
 # GSDiff Data Augmentation Guide
 
+> **📌 RECOMMENDED WORKFLOW:** If you're preparing custom data, see **[PRE_AUGMENTATION_WORKFLOW.md](PRE_AUGMENTATION_WORKFLOW.md)** for a streamlined guide on augmenting BEFORE placing data in the repo. This is the simpler approach!
+>
+> This guide covers general augmentation usage and technical details.
+
 ## Overview
 
 The `augment_floor_plans.py` script provides geometric data augmentation for GSDiff NPY floor plan files. It increases your dataset size by 4× or 8× while preserving the graph structure, adjacency relationships, and semantic information.
