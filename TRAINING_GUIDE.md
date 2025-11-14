@@ -17,7 +17,7 @@
 
 GSDiff uses a **multi-stage training pipeline** with three constraint variants:
 
-### Training Stages:
+### Training Stages
 
 ```
 Stage 1: Node Generation (Corner Prediction)
@@ -27,7 +27,7 @@ Stage 2: Edge Prediction (Wall Connectivity)
 Stage 3 (Optional): CNN Boundary Encoder
 ```
 
-### Three Constraint Variants:
+### Three Constraint Variants
 
 1. **Unconstrained**: Pure diffusion-based generation
 2. **Topology-Constrained**: Uses bubble diagram topology as conditioning
@@ -46,6 +46,7 @@ Stage 3 (Optional): CNN Boundary Encoder
 | **Boundary** | `/home/user/GSDiff/scripts/trainval_main_boun.py` | Train with boundary image conditioning | `BoundHeterHouseModel` (gsdiff/heterhouse_81_106_3.py) |
 
 **Key Parameters:**
+
 - Batch size: 256
 - Optimizer: AdamW (lr=1e-4, weight_decay=0 or 1e-7)
 - Diffusion steps: 1000
@@ -64,6 +65,7 @@ Stage 3 (Optional): CNN Boundary Encoder
 | **Main Boundary** | `/home/user/GSDiff/scripts/trainval_main_edge_boun.py` | Advanced edge prediction with CNN features |
 
 **Key Parameters:**
+
 - Batch size: 4-8
 - Optimizer: AdamW (lr=1e-4, weight_decay=1e-5)
 - Validation interval: 100-1000 steps
@@ -78,6 +80,7 @@ Stage 3 (Optional): CNN Boundary Encoder
 | **Stage 3** | `/home/user/GSDiff/scripts/train-CNN-autoe-final.py` | Fine-tuning on real RPLAN data |
 
 **Key Parameters:**
+
 - Batch size: 16
 - Optimizer: AdamW (lr=1e-5, weight_decay=0)
 - Loss: L1 loss (MAE)
@@ -115,6 +118,7 @@ padding_to_number = 53
 ```
 
 **Rationale:**
+
 - 53 is the maximum corner count observed in the RPLAN dataset
 - Using 100 would create `100×100 = 10,000` edge computations vs `53×53 = 2,809`
 - Memory efficiency: 4× reduction in edge matrix size
@@ -141,6 +145,7 @@ adjacency_matrix_np_padding = np.zeros((53, 53), dtype=np.uint8)
 All dataset loaders expect pre-padded data with shape (53, ...):
 
 **Files:**
+
 - `/home/user/GSDiff/datasets/rplang_edge_semantics_simplified.py` (Line 58)
 - `/home/user/GSDiff/datasets/rplang_edge_semantics_simplified_81.py` (Line 89)
 - `/home/user/GSDiff/datasets/rplang_edge_semantics_simplified_80.py` (Line 109)
@@ -148,6 +153,7 @@ All dataset loaders expect pre-padded data with shape (53, ...):
 - `/home/user/GSDiff/datasets/lifull_55_100.py` (Lines 77, 94-95, 106)
 
 **Example from lifull.py:**
+
 ```python
 corners_with_semantics_pad = np.zeros((53 - len(corners_with_semantics), 15))
 adjacency_matrix = np.zeros((53, 53), dtype=np.uint8)
@@ -160,6 +166,7 @@ pdm = np.zeros((53, 1), dtype=np.uint8)
 All models expect input tensors with shape `(batch_size, 53, features)`:
 
 **Files:**
+
 - `/home/user/GSDiff/gsdiff/heterhouse_80_106_2.py` (Lines 112-115)
 - `/home/user/GSDiff/gsdiff/house_nn2.py` (Line 127)
 - `/home/user/GSDiff/gsdiff/house_nn3.py` (Line 118)
@@ -168,6 +175,7 @@ All models expect input tensors with shape `(batch_size, 53, features)`:
 - `/home/user/GSDiff/gsdiff/heterhouse_56_32.py` (Line 184)
 
 **Example comment from heterhouse_80_106_2.py:**
+
 ```python
 '''corners: (batch size, 53(含padding), 512(角点空间上的维数))
   global_attn_matrix: (batch size, 53, 53) 非padding（左上角）为True，padding为False'''
@@ -178,6 +186,7 @@ All models expect input tensors with shape `(batch_size, 53, features)`:
 All training scripts create tensors with hardcoded 53:
 
 **Files:**
+
 - `/home/user/GSDiff/scripts/trainval_main_unconstrained.py` (Lines 393-394, 430, 615-627)
 - `/home/user/GSDiff/scripts/trainval_main_topo.py` (Lines 419-420, 460, 657-669)
 - `/home/user/GSDiff/scripts/trainval_main_boun.py` (Lines 672-684)
@@ -185,6 +194,7 @@ All training scripts create tensors with hardcoded 53:
 - `/home/user/GSDiff/scripts/test_boun.py` (Lines 345, 350, 355, 358)
 
 **Example from trainval_main_unconstrained.py:**
+
 ```python
 # Line 430
 corner_number = torch.ones((batch_size,), device=device) * 53
@@ -261,6 +271,7 @@ Dataset Loaders: rplang_edge_semantics_simplified_*.py
 **Purpose:** Extract corners and structure from RPLAN images
 
 **Processes:**
+
 - Reads 256×256 PNG floor plan images
 - Extracts semantic channels (14 room types)
 - Generates binary images via thresholding
@@ -273,6 +284,7 @@ Dataset Loaders: rplang_edge_semantics_simplified_*.py
 - **Output:** `structure_graphs.npy`
 
 **Key Functions:**
+
 - Corner detection using 4-neighbor analysis
 - Graph building from wall connectivity
 - Validation and filtering of invalid floor plans
@@ -280,12 +292,14 @@ Dataset Loaders: rplang_edge_semantics_simplified_*.py
 #### Step 2: Format Conversion
 
 **Files:**
+
 - `/home/user/GSDiff/datasets/rplan-process1.py` (31 lines)
 - `/home/user/GSDiff/datasets/rplan-process2.py` (29 lines)
 
 **Purpose:** Convert adjacency lists to matrices and reindex
 
 **Processes:**
+
 - Transforms corner-adjacency dictionaries to matrix form
 - Converts coordinate-based adjacency to index-based
 
@@ -320,6 +334,7 @@ def get_quadrant(coordinates):
 ```
 
 **Normalization Formula:**
+
 ```python
 # Line ~920: Coordinate normalization
 normalized_x = (x - 128) / 128  # Maps 0-256 to [-1, 1]
@@ -327,6 +342,7 @@ normalized_y = (y - 128) / 128
 ```
 
 **Padding to 53:**
+
 ```python
 # Lines 914-950
 padding_to_number = 53
@@ -345,6 +361,7 @@ adjacency_matrix_np_padding[:len(corners), :len(corners)] = adjacency_matrix
 ```
 
 **Output Dictionary Format:**
+
 ```python
 {
     'file_id': int,
@@ -367,6 +384,7 @@ adjacency_matrix_np_padding[:len(corners), :len(corners)] = adjacency_matrix
 #### Step 4: Add Boundary Features
 
 **Files:**
+
 - `/home/user/GSDiff/datasets/rplan-process5.py` (276 lines) - Training set
 - `/home/user/GSDiff/datasets/rplan-process6.py` (276 lines) - Validation set
 - `/home/user/GSDiff/datasets/rplan-process7.py` (277 lines) - Test set
@@ -378,6 +396,7 @@ adjacency_matrix_np_padding[:len(corners), :len(corners)] = adjacency_matrix
 #### Step 5: Generate Bubble Diagrams
 
 **Files:**
+
 - `/home/user/GSDiff/datasets/rplan-process8.py` (226 lines) - Training set
 - `/home/user/GSDiff/datasets/rplan-process9.py` (226 lines) - Validation set
 - `/home/user/GSDiff/datasets/rplan-process10.py` (226 lines) - Test set
@@ -385,6 +404,7 @@ adjacency_matrix_np_padding[:len(corners), :len(corners)] = adjacency_matrix
 **Purpose:** Create abstract bubble diagram topology
 
 **Output Format:**
+
 ```python
 {
     'file_id': int,
@@ -404,6 +424,7 @@ adjacency_matrix_np_padding[:len(corners), :len(corners)] = adjacency_matrix
 **Purpose:** Pre-compute CNN boundary features to save GPU memory during training
 
 **Process:**
+
 ```python
 # Loads pre-trained BoundaryModel from outputs/structure-78-12
 model = BoundaryModel()
@@ -429,6 +450,7 @@ for batch in dataloader:
 **File:** `/home/user/GSDiff/gsdiff/utils.py`
 
 #### Forward Normalization
+
 ```python
 # Applied in rplan-process4.py
 normalized_coord = (pixel_coord - 128) / 128  # [0, 256] → [-1, 1]
@@ -465,6 +487,7 @@ def inverse_normalize_and_remove_padding_4testing(result, results_corners_number
 #### RPLAN Semantics (7 classes)
 
 **Bubble Diagram:** 7-class system (0-6)
+
 - Used in topology-constrained variant
 - One-hot encoding per room
 
@@ -503,6 +526,7 @@ semantic_dict = {
 **File:** `/home/user/GSDiff/datasets/rplang_bubble_diagram.py`
 
 #### Semantic Augmentation
+
 ```python
 # Distribution learned from training data
 q_seman = {
@@ -521,6 +545,7 @@ if self.randomize_data:
 ```
 
 #### Edge Augmentation
+
 ```python
 # Edge probability distribution
 q_edge = [0.6489, 0.3511]  # [no_edge, edge]
@@ -614,6 +639,7 @@ python scripts/trainval_main_edge_unconstrained.py
 #### 1. Update Dataset Paths
 
 **In all training scripts**, modify:
+
 ```python
 # Change this:
 dataset_train = RPlanGEdgeSemanSimplified('train')
@@ -625,6 +651,7 @@ dataset_train = RPlanGEdgeSemanSimplified('train', data_root='/path/to/your/data
 #### 2. Update Device Settings
 
 **In all scripts:**
+
 ```python
 # Change from:
 device = 'cuda:0'
@@ -647,6 +674,7 @@ batch_size = 64   # ~6GB VRAM
 #### 4. Set Output Directory
 
 **In all training scripts:**
+
 ```python
 # Change this:
 output_dir = os.path.join('outputs', 'structure-56-36-interval1000')
@@ -658,11 +686,13 @@ output_dir = os.path.join('outputs', 'my_experiment_name')
 ### Monitoring Training
 
 All scripts save:
+
 - **Checkpoints:** `output_dir/model_stage1_XXXXXX.pt`
 - **Best model:** `output_dir/model_stage1_best_XXXXXX.pt`
 - **Logs:** TensorBoard logs in `output_dir/`
 
 View logs:
+
 ```bash
 tensorboard --logdir outputs/your_experiment_name
 ```
@@ -678,11 +708,13 @@ To increase the maximum corners from 53 to a new value (e.g., 100), you need to:
 ### Step 1: Choose New Corner Limit
 
 **Considerations:**
+
 - Memory usage scales as O(N²) for edge matrices
 - 53 → 100: Memory increase = (100²/53²) = 3.56×
 - 53 → 150: Memory increase = (150²/53²) = 8.0×
 
 **Edge matrix sizes:**
+
 - 53 corners: 2,809 edges
 - 100 corners: 10,000 edges (3.56× larger)
 - 150 corners: 22,500 edges (8.0× larger)
@@ -705,6 +737,7 @@ adjacency_matrix_np_padding = np.zeros((padding_to_number, padding_to_number))
 ```
 
 **Then regenerate:**
+
 ```bash
 python datasets/rplan-process4.py   # Regenerate all train/val/test
 python datasets/rplan-process5.py
@@ -717,6 +750,7 @@ python datasets/rplan-process7.py
 **Files to modify (10+ files):**
 
 #### `/home/user/GSDiff/datasets/lifull.py`
+
 ```python
 # Lines 90, 110, 112, 124: Change from 53 to 100
 corners_with_semantics_pad = np.zeros((100 - len(corners_with_semantics), 15))
@@ -726,11 +760,13 @@ pdm = np.zeros((100, 1), dtype=np.uint8)
 ```
 
 #### `/home/user/GSDiff/datasets/lifull_55_100.py`
+
 ```python
 # Lines 77, 94-95, 106: Same changes
 ```
 
 #### All `/home/user/GSDiff/datasets/rplang_edge_semantics_simplified*.py` files
+
 ```python
 # Update shape comments from (53, 16) to (100, 16)
 # Example from line 58:
@@ -752,6 +788,7 @@ All model files expect input shape `(batch, 53, ...)` - change to `(batch, 100, 
 ```
 
 **Files to update:**
+
 - `gsdiff/house_nn2.py`
 - `gsdiff/house_nn3.py`
 - `gsdiff/heterhouse_56_11.py`
@@ -780,6 +817,7 @@ corners_padding_mask_2 = torch.zeros((1, 100, 1), device=device)
 ```
 
 **Apply same changes to:**
+
 - `scripts/trainval_main_topo.py`
 - `scripts/trainval_main_boun.py`
 - `scripts/test_main.py`
@@ -836,7 +874,7 @@ sed -i 's/padding_to_number = 53/padding_to_number = 100/g' datasets/rplan-proce
 
 ### Complete File List Requiring Changes
 
-#### Critical Files (Must Change):
+#### Critical Files (Must Change)
 
 1. **Data Generation:**
    - `datasets/rplan-process4.py` (line 916)
@@ -928,6 +966,7 @@ python scripts/trainval_main_unconstrained.py  # Will error if shapes are incons
 | `gsdiff/heterhouse_75_106_lifull.py` | `HeterHouseModel` | LIFULL dataset variant | (batch, 53, 256) |
 
 **Architecture Components:**
+
 - **d_model**: 256 (embedding dimension)
 - **Transformer layers**: 6
 - **Attention heads**: 4
@@ -945,6 +984,7 @@ python scripts/trainval_main_unconstrained.py  # Will error if shapes are incons
 | `gsdiff/heterhouse_56_11_lifull.py` | `EdgeModel` | LIFULL edge prediction | (batch, 53, features) |
 
 **Architecture Components:**
+
 - **MultiHeadAttention**: Global attention mechanism
 - **Adaptive sampling**: Smart edge candidate selection
 - **Padding mask support**: Handles variable-length sequences
@@ -957,6 +997,7 @@ python scripts/trainval_main_unconstrained.py  # Will error if shapes are incons
 | `gsdiff/boundary_78_10.py` | `BoundaryModel` | CNN autoencoder for boundary images |
 
 **Architecture:**
+
 - **Encoder**: ResNet-style with skip connections
 - **Feature scales**: 64×64 (256ch), 32×32 (512ch), 16×16 (1024ch)
 - **Decoder**: Upsampling with Conv2DTranspose
@@ -969,6 +1010,7 @@ python scripts/trainval_main_unconstrained.py  # Will error if shapes are incons
 | `gsdiff/bubble_diagram_57_9.py` | `TopoGraphModel` | Bubble diagram transformer |
 
 **Architecture:**
+
 - **Node encoding**: Graph nodes representing rooms
 - **Edge encoding**: Room adjacency
 - **Output**: Semantic labels + adjacency predictions
@@ -1017,6 +1059,7 @@ align_points = True     # Align points for generation
 ### Stage 1: Node Generation
 
 **Unconstrained:**
+
 ```python
 # trainval_main_unconstrained.py
 batch_size = 256
@@ -1026,6 +1069,7 @@ merge_points = False
 ```
 
 **Topology:**
+
 ```python
 # trainval_main_topo.py
 batch_size = 256
@@ -1036,6 +1080,7 @@ merge_points = True
 ```
 
 **Boundary:**
+
 ```python
 # trainval_main_boun.py
 batch_size = 256
@@ -1082,6 +1127,7 @@ gradient_clip = 1.0
 ### Dataset Paths
 
 All datasets expect this structure:
+
 ```
 datasets/
 ├── rplang-v3-withsemantics/
@@ -1121,21 +1167,21 @@ outputs/
 
 ## Summary
 
-### To Retrain on New Data:
+### To Retrain on New Data
 
 1. **Prepare data:** Run preprocessing pipeline (rplan-extract.py → rplan-process*.py)
 2. **Choose variant:** Unconstrained, Topology, or Boundary
 3. **Train Stage 1:** Node generation (trainval_main_*.py)
 4. **Train Stage 2:** Edge prediction (trainval_main_edge_*.py)
 
-### To Change Corner Capacity:
+### To Change Corner Capacity
 
 1. **Update rplan-process4.py:** Change `padding_to_number = 53` to new value
 2. **Regenerate all data:** Run rplan-process4.py through rplan-process10.py
 3. **Update 50+ files:** Change all hardcoded "53" to new value
 4. **Verify:** Check all tensor shapes and run tests
 
-### Key Files to Remember:
+### Key Files to Remember
 
 - **Main training:** `scripts/trainval_main_*.py`
 - **Data generation:** `datasets/rplan-process4.py` (defines padding size)

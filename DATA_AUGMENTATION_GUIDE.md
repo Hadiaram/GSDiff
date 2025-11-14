@@ -7,12 +7,14 @@ The `augment_floor_plans.py` script provides geometric data augmentation for GSD
 ## Why Use Data Augmentation?
 
 **Benefits:**
+
 1. **Increase dataset size** without collecting new floor plans
 2. **Improve model generalization** by exposing it to different orientations
 3. **Reduce overfitting** especially when training data is limited
 4. **Maintain data quality** - transformations preserve geometric validity
 
 **When to use:**
+
 - You have a small dataset (< 1000 floor plans)
 - You want to increase model robustness to different orientations
 - You're retraining with limited custom data
@@ -30,6 +32,7 @@ pip install numpy tqdm
 ```
 
 Make the script executable:
+
 ```bash
 chmod +x augment_floor_plans.py
 ```
@@ -69,6 +72,7 @@ python augment_floor_plans.py \
 ### Strategy 1: Flip Only (4× Dataset)
 
 **Transformations applied:**
+
 1. **Original** - Unchanged copy
 2. **Horizontal flip** - Mirror across Y-axis
 3. **Vertical flip** - Mirror across X-axis
@@ -77,6 +81,7 @@ python augment_floor_plans.py \
 **Use case:** Conservative augmentation, maintains architectural conventions
 
 **Example:**
+
 ```bash
 python augment_floor_plans.py \
     --input_dir data/train \
@@ -85,6 +90,7 @@ python augment_floor_plans.py \
 ```
 
 **Output files (from `0.npy`):**
+
 - `0_original.npy` - Original floor plan
 - `0_hflip.npy` - Horizontally flipped
 - `0_vflip.npy` - Vertically flipped
@@ -93,6 +99,7 @@ python augment_floor_plans.py \
 ### Strategy 2: Full Augmentation (8× Dataset)
 
 **Transformations applied:**
+
 1. **Original**
 2. **Horizontal flip**
 3. **Vertical flip**
@@ -105,6 +112,7 @@ python augment_floor_plans.py \
 **Use case:** Maximum augmentation, best for small datasets
 
 **Example:**
+
 ```bash
 python augment_floor_plans.py \
     --input_dir data/train \
@@ -113,6 +121,7 @@ python augment_floor_plans.py \
 ```
 
 **Output files (from `0.npy`):**
+
 - `0_original.npy`
 - `0_hflip.npy`
 - `0_vflip.npy`
@@ -212,6 +221,7 @@ python augment_floor_plans.py \
 ```
 
 **Output:**
+
 ```
 augmented_samples/
 ├── 0_original.npy
@@ -237,6 +247,7 @@ python augment_floor_plans.py \
 **Creates:** `data/train_augmented/augmentation_manifest.txt`
 
 **Manifest content:**
+
 ```
 Floor Plan Augmentation Manifest
 ============================================================
@@ -263,12 +274,14 @@ File: 0_hflip.npy
 The script transforms **only coordinate data**, preserving all other information:
 
 **Transformed:**
+
 - ✅ `corner_list_np_normalized` - Corner coordinates
 - ✅ `corner_list_np_normalized_padding` - Padded corner coordinates
 - ✅ `corner_list_np_normalized_padding_withsemantics` - Coordinates (columns 0-1 only)
 - ✅ `edge_coords` - Edge endpoint coordinates
 
 **Preserved (unchanged):**
+
 - ✅ `adjacency_matrix` - Corner connectivity (structure preserved)
 - ✅ `adjacency_matrix_np_padding` - Padded adjacency
 - ✅ `edges` - Flattened edge matrix
@@ -282,43 +295,54 @@ The script transforms **only coordinate data**, preserving all other information
 All transformations work in **normalized [-1, 1] coordinate space**:
 
 #### Horizontal Flip
+
 ```python
 x' = -x
 y' = y
 ```
+
 Mirrors across Y-axis (left ↔ right)
 
 #### Vertical Flip
+
 ```python
 x' = x
 y' = -y
 ```
+
 Mirrors across X-axis (top ↔ bottom)
 
 #### 90° Rotation (Counterclockwise)
+
 ```python
 x' = -y
 y' = x
 ```
+
 Rotation matrix: `[0, -1; 1, 0]`
 
 #### 180° Rotation
+
 ```python
 x' = -x
 y' = -y
 ```
+
 Equivalent to horizontal + vertical flip
 
 #### 270° Rotation (90° Clockwise)
+
 ```python
 x' = y
 y' = -x
 ```
+
 Rotation matrix: `[0, 1; -1, 0]`
 
 ### Why Adjacency Is Preserved
 
 The adjacency matrix represents **which corners are connected**, not their spatial positions. Since transformations:
+
 - Don't add or remove corners
 - Don't change which corners connect to which
 - Only change spatial positions
@@ -326,6 +350,7 @@ The adjacency matrix represents **which corners are connected**, not their spati
 The adjacency relationships remain valid after transformation.
 
 **Example:**
+
 ```
 Original floor plan:
   Corner 0 connected to Corner 1
@@ -345,6 +370,7 @@ The wall is simply rotated or flipped, but the connectivity is identical.
 ### Option 1: Pre-Augment Before Training
 
 **Workflow:**
+
 ```bash
 # 1. Augment your dataset
 python augment_floor_plans.py \
@@ -364,11 +390,13 @@ python scripts/trainval_main_unconstrained.py
 ```
 
 **Pros:**
+
 - ✅ Augmentation done once, not during every epoch
 - ✅ Faster training (no on-the-fly augmentation overhead)
 - ✅ Easy to verify augmented data
 
 **Cons:**
+
 - ❌ Uses more disk space (4× or 8× original size)
 - ❌ Less flexible (can't change augmentation during training)
 
@@ -392,18 +420,21 @@ python augment_floor_plans.py \
 **Example calculation for RPLAN dataset:**
 
 Original dataset:
+
 - Train: 60,000 files × 150KB = 9GB
 - Val: 10,000 files × 150KB = 1.5GB
 - Test: 10,000 files × 150KB = 1.5GB
 - **Total: 12GB**
 
 After 4× augmentation (flip_only):
+
 - Train: 60,000 × 4 = 240,000 files × 150KB = 36GB
 - Val: 10,000 × 4 = 40,000 files × 150KB = 6GB
 - Test: 10,000 files (unchanged) × 150KB = 1.5GB
 - **Total: 43.5GB** (+31.5GB)
 
 After 8× augmentation (full):
+
 - Train: 60,000 × 8 = 480,000 files × 150KB = 72GB
 - Val: 10,000 × 8 = 80,000 files × 150KB = 12GB
 - Test: 10,000 files (unchanged) × 150KB = 1.5GB
@@ -494,6 +525,7 @@ cat datasets/train_aug/augmentation_manifest.txt
 ### Issue: "No .npy files found"
 
 **Solution:** Check that input directory contains .npy files:
+
 ```bash
 ls -lh datasets/rplang-v3-withsemantics/train/*.npy
 ```
@@ -507,6 +539,7 @@ ls -lh datasets/rplang-v3-withsemantics/train/*.npy
 ### Issue: Out of Disk Space
 
 **Solution:** Augment in batches or use flip_only instead of full:
+
 ```bash
 # Smaller augmentation
 python augment_floor_plans.py \
@@ -529,14 +562,17 @@ file_id_offset = stats['created'] + 100000  # Add offset
 ## Performance
 
 **Processing speed:**
+
 - ~50-100 files/second on standard CPU
 - Processing 60,000 files (full augmentation) takes ~10-15 minutes
 
 **Memory usage:**
+
 - Processes one file at a time
 - Peak memory: ~500MB
 
 **Example benchmark:**
+
 ```bash
 time python augment_floor_plans.py \
     --input_dir datasets/train \
@@ -633,16 +669,19 @@ for npy_file in input_dir.glob('*.npy'):
 ### Recommendations
 
 ✅ **Use flip_only for:**
+
 - Architectural floor plans (real buildings)
 - Large datasets (> 50,000 samples)
 - Limited disk space
 
 ✅ **Use full for:**
+
 - Small datasets (< 10,000 samples)
 - Abstract/synthetic floor plans
 - Maximum model robustness
 
 ✅ **Always:**
+
 - Keep test set un-augmented
 - Verify augmented samples visually
 - Use `--create_manifest` for tracking
