@@ -47,7 +47,30 @@ Topics covered:
 
 ---
 
-### 3. [DATA_AUGMENTATION_GUIDE.md](DATA_AUGMENTATION_GUIDE.md)
+### 3. [RETRAINING_WITH_EXISTING_DATA.md](RETRAINING_WITH_EXISTING_DATA.md) ⭐ NEW
+**How to retrain while preserving knowledge from previous data**
+
+Topics covered:
+- **Two Approaches** - Combined training vs fine-tuning from checkpoint
+- **Step-by-Step Workflows** - Complete examples for both approaches
+- **Checkpoint Loading** - How to resume from saved models
+- **Fine-Tuning Strategy** - Learning rates, steps, and avoiding catastrophic forgetting
+- **Handling Different Corner Counts** - Mixing datasets with different capacities
+- **Training Configuration** - All three stages explained
+- **Monitoring Progress** - Loss curves, FID/KID metrics, validation
+- **Best Practices** - When to combine data vs fine-tune
+- **Complete Example** - Adding 10k new floor plans to existing 65k dataset
+
+**Use this when:**
+- Adding new data to an already-trained model
+- Want to preserve previous knowledge while learning new patterns
+- Have checkpoints from previous training runs
+- Need to retrain without starting completely from scratch
+- Combining multiple datasets (old + new data)
+
+---
+
+### 4. [DATA_AUGMENTATION_GUIDE.md](DATA_AUGMENTATION_GUIDE.md)
 **Data augmentation documentation (1,000+ lines) - Technical reference**
 
 Topics covered:
@@ -219,7 +242,25 @@ python scripts/trainval_main_unconstrained.py
 4. Regenerate all NPY files
 5. Retrain models with new capacity
 
-### Use Case 3: Retrain on Different Domain
+### Use Case 3: Add New Data While Preserving Old Knowledge
+**Scenario:** You have a trained model on 60k floor plans, want to add 10k new ones
+
+**Solution:**
+```bash
+# Follow RETRAINING_WITH_EXISTING_DATA.md
+
+# Option A: Combine all data (recommended)
+cp new_data/*.npy ../datasets/rplang-v3-withsemantics/train/
+python scripts/trainval_main_unconstrained.py
+
+# Option B: Fine-tune from checkpoint (faster)
+# Modify training script to load checkpoint
+# Set lr = 1e-5 (lower than default 1e-4)
+# Train for 200k steps instead of 1M
+python scripts/trainval_main_unconstrained.py
+```
+
+### Use Case 4: Retrain on Different Domain
 **Scenario:** Train on commercial buildings instead of residential
 
 **Solution:**
@@ -235,9 +276,10 @@ python scripts/trainval_main_unconstrained.py
 
 | File | Type | Purpose | Size |
 |------|------|---------|------|
-| `README_DOCS.md` | Documentation | Master index (this file) | 10KB |
+| `README_DOCS.md` | Documentation | Master index (this file) | 11KB |
 | `PRE_AUGMENTATION_WORKFLOW.md` | Documentation | ⭐ Recommended workflow for custom data | 15KB |
 | `TRAINING_GUIDE.md` | Documentation | Complete training reference | 35KB |
+| `RETRAINING_WITH_EXISTING_DATA.md` | Documentation | ⭐ Retrain with old + new data | 24KB |
 | `DATA_AUGMENTATION_GUIDE.md` | Documentation | Technical augmentation reference | 17KB |
 | `json_to_npy_floodfill.py` | Script | JSON → Raster NPY converter | 17KB |
 | `raster_to_graph_converter.py` | Script | Raster NPY → Graph NPY converter | 16KB |
