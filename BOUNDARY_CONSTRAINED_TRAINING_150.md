@@ -73,6 +73,7 @@ python create_cnn_featuremaps.py \
 ```
 
 **Important Notes:**
+
 - CNN feature maps go into a **single directory** (no train/val/test splits) - this is by design!
 - The dataset loader expects all feature maps in `datasets/prerunning_cnn_featuremaps/`
 - Withboundary files **do** split into train/val/test subdirectories
@@ -110,6 +111,7 @@ echo "CNN feature maps: $(ls datasets/prerunning_cnn_featuremaps/*.npy | wc -l)"
 ```
 
 **Expected output:**
+
 - All counts should match (e.g., 1000 train + 50 val + 50 test = 1100 total)
 - CNN feature maps count should equal total files across all splits
 
@@ -122,6 +124,7 @@ echo "CNN feature maps: $(ls datasets/prerunning_cnn_featuremaps/*.npy | wc -l)"
 Edit the training scripts to match your system paths:
 
 **File: `scripts/trainval_main_boun.py`** (Lines 2-5)
+
 ```python
 sys.path.append('/home/user/GSDiff')  # Update to your project root
 sys.path.append('/home/user/GSDiff/datasets')
@@ -130,6 +133,7 @@ sys.path.append('/home/user/GSDiff/scripts/metrics')
 ```
 
 **File: `scripts/trainval_main_edge_boun.py`** (Lines 3-5)
+
 ```python
 sys.path.append('/home/user/GSDiff')  # Update to your project root
 sys.path.append('/home/user/GSDiff/datasets')
@@ -139,6 +143,7 @@ sys.path.append('/home/user/GSDiff/gsdiff')
 ### 4.2 Configure Hyperparameters
 
 **Stage 1 (Node Generation) - `trainval_main_boun.py`:**
+
 ```python
 diffusion_steps = 1000
 lr = 1e-4
@@ -150,6 +155,7 @@ device = 'cuda:0'  # Update to your GPU
 ```
 
 **Stage 2 (Edge Prediction) - `trainval_main_edge_boun.py`:**
+
 ```python
 lr = 1e-4
 weight_decay = 1e-5
@@ -186,6 +192,7 @@ python scripts/trainval_main_boun.py
 ### 5.2 Training Details
 
 **What happens during training:**
+
 - Loads data from `RPlanGEdgeSemanSimplified_81` dataset loader
 - Uses `BoundHeterHouseModel` from `heterhouse_81_106_3.py`
 - Applies truncated normal noise to corners
@@ -194,11 +201,13 @@ python scripts/trainval_main_boun.py
 - Saves checkpoints periodically
 
 **Expected timeline:**
+
 - Total steps: 1,000,000
 - Time per step: ~0.5-1.0 seconds (depends on GPU)
 - Total training time: ~5-10 days on single GPU
 
 **Monitoring:**
+
 - Loss should decrease over time
 - Validation loss should track training loss
 - Check tensorboard logs if configured
@@ -206,6 +215,7 @@ python scripts/trainval_main_boun.py
 ### 5.3 Checkpoints
 
 Model checkpoints are saved in the output directory:
+
 ```
 outputs/stage1_boun_150corners/
 ├── checkpoint_step_10000.pt
@@ -240,6 +250,7 @@ python scripts/trainval_main_edge_boun.py
 ### 6.3 Training Details
 
 **What happens during training:**
+
 - Loads corners from Stage 1 model
 - Uses `BoundEdgeModel` to predict edge connectivity
 - Applies perturbations to corners and semantics
@@ -247,6 +258,7 @@ python scripts/trainval_main_edge_boun.py
 - Validates on validation set
 
 **Expected timeline:**
+
 - Steps: Until convergence (monitor validation loss)
 - Typically converges in 50,000-200,000 steps
 - Time: 1-3 days on single GPU
@@ -268,6 +280,7 @@ python scripts/test_boun.py \
 ### 7.2 Evaluation Metrics
 
 The test script will compute:
+
 - **FID (Fréchet Inception Distance)**: Measures generation quality
 - **KID (Kernel Inception Distance)**: Alternative quality metric
 - **Validity**: Percentage of valid floor plans
@@ -290,7 +303,7 @@ python visualize_results.py \
 
 All files have been updated from 53 to 150 corners:
 
-### Updated Files (6 total):
+### Updated Files (6 total)
 
 1. **`datasets/rplang_edge_semantics_simplified_81.py`**
    - Dataset loader for boundary-constrained training
@@ -324,19 +337,25 @@ All files have been updated from 53 to 150 corners:
 ## Troubleshooting
 
 ### Issue: "RuntimeError: shape mismatch"
+
 **Solution:** Verify all files are using 150-corner capacity. Check conversion logs.
 
 ### Issue: "FileNotFoundError: prerunning_cnn_featuremaps"
+
 **Solution:** Run `create_cnn_featuremaps.py` to generate feature maps for all files.
 
 ### Issue: "CUDA out of memory"
+
 **Solution:** Reduce batch_size in training scripts. For Stage 1, try 128 instead of 256.
 
 ### Issue: "ValueError: invalid literal for int()"
+
 **Solution:** Descriptive filenames are supported. Dataset loader has fallback sorting.
 
 ### Issue: Training loss not decreasing
+
 **Solution:**
+
 - Check data integrity (all files have correct shape)
 - Verify CNN feature maps match graph files
 - Try reducing learning rate (1e-5 instead of 1e-4)
@@ -348,11 +367,13 @@ All files have been updated from 53 to 150 corners:
 ### GPU Memory Usage
 
 **Expected memory usage:**
+
 - Stage 1 training: ~12-16GB with batch_size=256
 - Stage 2 training: ~8-12GB with batch_size=4
 - Testing: ~6-8GB
 
 **To reduce memory:**
+
 - Decrease batch_size
 - Use gradient checkpointing (requires model modification)
 - Use mixed precision training (FP16)
@@ -360,6 +381,7 @@ All files have been updated from 53 to 150 corners:
 ### Training Speed
 
 **Optimization tips:**
+
 - Use `num_workers > 0` in DataLoader for parallel data loading
 - Pin memory: `pin_memory=True`
 - Use faster storage (SSD) for datasets
