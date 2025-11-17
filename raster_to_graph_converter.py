@@ -219,7 +219,7 @@ def normalize_coordinates(corners, image_size=256):
     return normalized
 
 
-def convert_raster_to_graph(raster_file, output_file, image_size=256):
+def convert_raster_to_graph(raster_file, output_file, image_size=256, max_corners=150):
     """
     Convert a single raster NPY file to GSDiff graph format.
 
@@ -263,19 +263,19 @@ def convert_raster_to_graph(raster_file, output_file, image_size=256):
         print(f"Warning: No corners found in {raster_file}")
         return False
 
-    if len(corners) > 53:
-        print(f"Warning: Too many corners ({len(corners)}) in {raster_file}, truncating to 53")
+    if len(corners) > max_corners:
+        print(f"Warning: Too many corners ({len(corners)}) in {raster_file}, truncating to {max_corners}")
         # Simplify more aggressively
         room_polygons = extract_all_rooms(raster_array, max_corners_per_room=8)
         corners, adjacency_matrix, adjacency_list, corner_to_rooms = build_graph_from_rooms(
             room_polygons, image_size
         )
 
-        if len(corners) > 53:
+        if len(corners) > max_corners:
             # Still too many, truncate
-            corners = corners[:53]
-            adjacency_matrix = [row[:53] for row in adjacency_matrix[:53]]
-            adjacency_list = adjacency_list[:53]
+            corners = corners[:max_corners]
+            adjacency_matrix = [row[:max_corners] for row in adjacency_matrix[:max_corners]]
+            adjacency_list = adjacency_list[:max_corners]
 
     # Create graph dictionary
     g = {}
@@ -300,8 +300,8 @@ def convert_raster_to_graph(raster_file, output_file, image_size=256):
     corner_list_np_normalized = normalize_coordinates(corners, image_size)
     g['corner_list_np_normalized'] = corner_list_np_normalized
 
-    # Padding to 53 corners
-    padding_to_number = 53
+    # Padding to max_corners
+    padding_to_number = max_corners
 
     # Padded corner list
     corner_list_np_normalized_padding = np.zeros((padding_to_number, 2), dtype=np.float64)
@@ -363,7 +363,7 @@ def convert_raster_to_graph(raster_file, output_file, image_size=256):
     return True
 
 
-def batch_convert(input_dir, output_dir, image_size=256):
+def batch_convert(input_dir, output_dir, image_size=256, max_corners=150):
     """
     Convert all raster NPY files in input_dir to graph format in output_dir.
     """
@@ -388,7 +388,7 @@ def batch_convert(input_dir, output_dir, image_size=256):
         output_file = output_path / npy_file.name
 
         try:
-            if convert_raster_to_graph(npy_file, output_file, image_size):
+            if convert_raster_to_graph(npy_file, output_file, image_size, max_corners):
                 success_count += 1
         except Exception as e:
             print(f"\nError processing {npy_file}: {e}")
@@ -453,13 +453,15 @@ if __name__ == '__main__':
                         help='Directory to save converted graph NPY files')
     parser.add_argument('--image_size', type=int, default=256,
                         help='Size of the raster images (default: 256)')
+    parser.add_argument('--max_corners', type=int, default=150,
+                        help='Maximum number of corners to allow (default: 150)')
     parser.add_argument('--validate', action='store_true',
                         help='Validate converted files after conversion')
 
     args = parser.parse_args()
 
     # Convert files
-    batch_convert(args.input_dir, args.output_dir, args.image_size)
+    batch_convert(args.input_dir, args.output_dir, args.image_size, args.max_corners)
 
     # Validate if requested
     if args.validate:
