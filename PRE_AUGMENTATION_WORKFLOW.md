@@ -61,6 +61,7 @@ python augment_floor_plans.py \
 ```
 
 **Result:** Augmented directory now contains:
+
 ```
 augmented_npy/
 ├── 0_original.npy
@@ -241,11 +242,13 @@ Original files → Augmented files
 ### Option 1: Keep Descriptive Names (Recommended for Development)
 
 **Pros:**
+
 - ✅ Easy to identify augmentation type
 - ✅ Easy to debug issues
 - ✅ Can track augmentation manifest
 
 **Cons:**
+
 - ❌ File names are longer
 - ❌ May need to handle underscore in filenames
 
@@ -269,16 +272,19 @@ EOF
 ```
 
 **Result:**
+
 ```
 0.npy, 1.npy, 2.npy, ..., 7999.npy
 # (if you had 1000 originals × 8 augmentations = 8000 files)
 ```
 
 **Pros:**
+
 - ✅ Clean sequential numbering
 - ✅ Matches original RPLAN format
 
 **Cons:**
+
 - ❌ Loses track of which augmentation was applied
 - ❌ Harder to debug issues
 
@@ -300,6 +306,7 @@ python augment_floor_plans.py \
 ```
 
 **Why:** You may need originals for:
+
 - Test set (use only non-augmented)
 - Debugging issues
 - Trying different augmentation strategies
@@ -460,6 +467,7 @@ python scripts/trainval_main_unconstrained.py
 Calculate required space for your augmented dataset:
 
 **Formula:**
+
 ```
 Augmented size = Original size × Augmentation factor
 
@@ -470,6 +478,7 @@ Example with 1,000 files:
 ```
 
 **Your calculation:**
+
 ```python
 # Quick calculator
 original_files = 1000        # Your number of files
