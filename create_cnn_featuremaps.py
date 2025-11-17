@@ -130,23 +130,39 @@ if __name__ == '__main__':
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-    # Create feature maps for your test data
-    python create_cnn_featuremaps.py --test_dir datasets/rplang-v3-withsemantics/test
+    # Single split (test)
+    python create_cnn_featuremaps.py \\
+        --test_dir datasets/test \\
+        --feature_dir datasets/prerunning_cnn_featuremaps/test \\
+        --withboundary_dir datasets/withboundary/test
 
-    # Also create withboundary files
-    python create_cnn_featuremaps.py --test_dir datasets/rplang-v3-withsemantics/test --create_withboundary
+    # Process all splits automatically
+    python create_cnn_featuremaps.py \\
+        --split_root augmented_npy_split \\
+        --create_withboundary
+
+    # Auto-detect split type from directory name
+    python create_cnn_featuremaps.py \\
+        --test_dir augmented_npy_split/test \\
+        --auto_structure \\
+        --create_withboundary
         """
     )
 
     parser.add_argument('--test_dir', type=str,
-                        default='datasets/rplang-v3-withsemantics/test',
+                        default=None,
                         help='Directory containing test NPY files')
+    parser.add_argument('--split_root', type=str,
+                        default=None,
+                        help='Root directory containing train/val/test subdirs (processes all)')
     parser.add_argument('--feature_dir', type=str,
                         default='datasets/prerunning_cnn_featuremaps',
                         help='Where to save feature maps')
     parser.add_argument('--withboundary_dir', type=str,
                         default='datasets/rplang-v3-withsemantics-withboundary/test',
                         help='Where to save withboundary files')
+    parser.add_argument('--auto_structure', action='store_true',
+                        help='Auto-detect train/val/test from path and create matching structure')
     parser.add_argument('--create_withboundary', action='store_true',
                         help='Also create withboundary files')
     parser.add_argument('--max_corners', type=int, default=150,
@@ -154,11 +170,68 @@ Examples:
 
     args = parser.parse_args()
 
-    # Create feature maps
-    create_featuremaps_for_directory(args.test_dir, args.feature_dir, args.max_corners)
+    # Handle batch processing of all splits
+    if args.split_root:
+        split_root = Path(args.split_root)
+        splits = ['train', 'val', 'test']
 
-    # Create withboundary files if requested
-    if args.create_withboundary:
-        create_withboundary_files(args.test_dir, args.withboundary_dir, args.max_corners)
+        print(f"Processing all splits in {args.split_root}...")
+        for split in splits:
+            split_dir = split_root / split
+            if not split_dir.exists():
+                print(f"⚠️  Skipping {split}: directory not found")
+                continue
 
-    print("\n✓ Done! You can now run test_boun.py")
+            print(f"\n{'='*60}")
+            print(f"Processing {split} split...")
+            print(f"{'='*60}")
+
+            # Create output directories with split names
+            feature_out = Path(args.feature_dir) / split
+            withboundary_out = Path(args.withboundary_dir.replace('/test', '')) / split
+
+            create_featuremaps_for_directory(str(split_dir), str(feature_out), args.max_corners)
+
+            if args.create_withboundary:
+                create_withboundary_files(str(split_dir), str(withboundary_out), args.max_corners)
+
+        print(f"\n{'='*60}")
+        print("✓ Done processing all splits!")
+        print(f"{'='*60}")
+
+    # Handle single directory with auto-structure detection
+    elif args.test_dir:
+        test_path = Path(args.test_dir)
+
+        # Auto-detect split type from directory name
+        if args.auto_structure:
+            split_name = None
+            for part in test_path.parts[::-1]:  # Check from end to start
+                if part in ['train', 'val', 'test']:
+                    split_name = part
+                    break
+
+            if split_name:
+                print(f"Auto-detected split: {split_name}")
+                feature_out = Path(args.feature_dir) / split_name
+                withboundary_out = Path(args.withboundary_dir.replace('/test', '')) / split_name
+            else:
+                print("⚠️  Could not auto-detect split, using default paths")
+                feature_out = Path(args.feature_dir)
+                withboundary_out = Path(args.withboundary_dir)
+        else:
+            feature_out = Path(args.feature_dir)
+            withboundary_out = Path(args.withboundary_dir)
+
+        # Create feature maps
+        create_featuremaps_for_directory(args.test_dir, str(feature_out), args.max_corners)
+
+        # Create withboundary files if requested
+        if args.create_withboundary:
+            create_withboundary_files(args.test_dir, str(withboundary_out), args.max_corners)
+
+        print("\n✓ Done!")
+
+    else:
+        parser.error("Must specify either --test_dir or --split_root")
+
