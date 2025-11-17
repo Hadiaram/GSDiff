@@ -212,6 +212,51 @@ python augment_floor_plans.py \
 
 ---
 
+### [split_dataset.py](split_dataset.py)
+**Split NPY files into train/validation/test sets**
+
+**Features:**
+- Configurable split ratios (default: 90/5/5)
+- Reproducible with random seed
+- Progress tracking with tqdm
+- Preserves original files (copies instead of moving)
+- Validates ratio sum to 1.0
+
+**Quick Examples:**
+
+```bash
+# Standard 90/5/5 split
+python split_dataset.py \
+    --input_dir graph_npy
+
+# Custom ratios (80/10/10)
+python split_dataset.py \
+    --input_dir graph_npy \
+    --train_ratio 0.8 \
+    --val_ratio 0.1 \
+    --test_ratio 0.1
+
+# Specify output directory
+python split_dataset.py \
+    --input_dir graph_npy \
+    --output_dir my_split_data
+
+# Use different random seed
+python split_dataset.py \
+    --input_dir graph_npy \
+    --seed 123
+```
+
+**Output Structure:**
+```
+graph_npy_split/
+├── train/     # 90% of files
+├── val/       # 5% of files
+└── test/      # 5% of files
+```
+
+---
+
 ## 🚀 Quick Start Guide
 
 ### For Training New Models
@@ -301,7 +346,7 @@ python scripts/trainval_main_unconstrained.py
 
 | File | Type | Purpose | Size |
 |------|------|---------|------|
-| `README_DOCS.md` | Documentation | Master index (this file) | 12KB |
+| `README_DOCS.md` | Documentation | Master index (this file) | 13KB |
 | `PRE_AUGMENTATION_WORKFLOW.md` | Documentation | ⭐ Recommended workflow for custom data | 15KB |
 | `TRAINING_GUIDE.md` | Documentation | Complete training reference | 35KB |
 | `RETRAINING_WITH_EXISTING_DATA.md` | Documentation | ⭐ Retrain with old + new data | 24KB |
@@ -310,6 +355,7 @@ python scripts/trainval_main_unconstrained.py
 | `json_to_npy_floodfill.py` | Script | JSON → Raster NPY converter | 17KB |
 | `raster_to_graph_converter.py` | Script | Raster NPY → Graph NPY converter | 16KB |
 | `augment_floor_plans.py` | Script | Graph NPY augmentation tool | 14KB |
+| `split_dataset.py` | Script | Train/val/test splitter | 6KB |
 
 ---
 
