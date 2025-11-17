@@ -1,8 +1,8 @@
 import sys
-sys.path.append('/home/user00/HSZ/gsdiff-main') # Modify it yourself
-sys.path.append('/home/user00/HSZ/gsdiff-main/datasets') # Modify it yourself
-sys.path.append('/home/user00/HSZ/gsdiff-main/gsdiff') # Modify it yourself
-sys.path.append('/home/user00/HSZ/gsdiff-main/scripts/metrics') # Modify it yourself
+sys.path.insert(0, r'C:\Users\hmbashir\AI Training\GSDiff')
+sys.path.insert(0, r'C:\Users\hmbashir\AI Training\GSDiff\datasets')
+sys.path.insert(0, r'C:\Users\hmbashir\AI Training\GSDiff\gsdiff')
+sys.path.insert(0, r'C:\Users\hmbashir\AI Training\GSDiff\scripts\metrics')
 
 '''This is the script to train a node generation model with boundary constraint'''
 
