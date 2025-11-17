@@ -1,8 +1,8 @@
 import sys
-sys.path.insert(0, r'C:\Users\hmbashir\AI Training\GSDiff')
-sys.path.insert(0, r'C:\Users\hmbashir\AI Training\GSDiff\datasets')
-sys.path.insert(0, r'C:\Users\hmbashir\AI Training\GSDiff\gsdiff')
-sys.path.insert(0, r'C:\Users\hmbashir\AI Training\GSDiff\scripts\metrics')
+sys.path.append('/home/user/GSDiff')  # Updated for current environment
+sys.path.append('/home/user/GSDiff/datasets')
+sys.path.append('/home/user/GSDiff/gsdiff')
+sys.path.append('/home/user/GSDiff/scripts/metrics')
 
 '''This is the script to train a node generation model with boundary constraint'''
 
@@ -28,12 +28,12 @@ from datasets.rplang_edge_semantics_simplified_81 import RPlanGEdgeSemanSimplifi
 
 
 diffusion_steps = 1000
-lr = 1e-4
+lr = 1.5e-4  # OPTIMIZED: Slightly higher for faster convergence with smaller dataset
 weight_decay = 1e-7
-total_steps = 1000000
-batch_size = 256
-batch_size_val = 3000 
-device = 'cuda:0' # Modify it yourself
+total_steps = 150000  # OPTIMIZED: ~7x faster - 1051 samples need ~150k steps (vs 1M for 66k samples)
+batch_size = 256  # Keep at 256, reduce to 128 if GPU memory issues
+batch_size_val = 1051  # OPTIMIZED: Match your actual validation set size
+device = 'cuda:0'
 merge_points = True
 clamp_trick_training = True
 
@@ -169,8 +169,8 @@ def map_to_sxtnary(tensor):
 # assert 0
 
 '''create output_dir'''
-output_dir = 'outputs/structure-81-106-3/'
-os.makedirs(output_dir, exist_ok=False)
+output_dir = 'outputs/boun-150corners-1051samples/'  # OPTIMIZED: Descriptive name for this training run
+os.makedirs(output_dir, exist_ok=True)  # Changed to True in case you restart training
 
 '''Diffusion Settings'''
 # cosine beta
@@ -311,7 +311,7 @@ step = 0
 # loss_curve = []
 # val_metrics = []
 
-interval = 1000000 # real config
+interval = 15000  # OPTIMIZED: Validate every 15k steps to monitor progress and enable early stopping
 while step < total_steps:
     '''a batch of data'''
     # feat_64, feat_32, feat_16, corners_withsemantics_0, global_attn_matrix, corners_padding_mask = next(dataloader_train_iter)
@@ -511,14 +511,13 @@ while step < total_steps:
     #      masked_tensor_sxt.item() * 100000,  masked_tensor_inf.item() * 100000])
 
     '''save model per interval steps'''
-    # if step % interval == 0:
-    if 1:
+    if step % interval == 0 and step > 0:  # FIXED: Save at intervals, removed debug code
         state_dict = model.state_dict()
         for i, (name, _value) in enumerate(model.named_parameters()):
             state_dict[name] = list(model.parameters())[i]
         torch.save(state_dict, output_dir + f"model{step:07d}.pt")
         torch.save(optimizer.state_dict(), output_dir + f"optim{step:07d}.pt")
-        assert 0
+        print(f"Checkpoint saved at step {step}")
         '''saving loss curve'''
         # np.save(output_dir + 'loss_curve.npy', np.array(loss_curve))
 
@@ -774,6 +773,6 @@ while step < total_steps:
         model.train()
 
         '''lr decay'''
-        if step in [500000]:
+        if step in [100000]:  # OPTIMIZED: Decay at 100k steps (2/3 through training) instead of 500k
             for param_group in optimizer.param_groups:
                 param_group['lr'] *= 0.1
