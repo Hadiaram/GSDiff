@@ -244,8 +244,8 @@ def convert_raster_to_graph(raster_file, output_file, image_size=256):
     else:
         raise ValueError(f"Unexpected data type: {type(raster_data)}")
 
-    # Extract file ID from filename
-    file_id = int(Path(raster_file).stem)
+    # Extract file ID from filename (keep as string to support descriptive names)
+    file_id = Path(raster_file).stem
 
     # Extract room polygons
     room_polygons = extract_all_rooms(raster_array, max_corners_per_room=15)
