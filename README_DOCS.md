@@ -90,6 +90,31 @@ Topics covered:
 
 ---
 
+### 5. [DIFFUSION_MODEL_RETRAINING_THEORY.md](DIFFUSION_MODEL_RETRAINING_THEORY.md) 📖 THEORY
+**Deep theoretical guide to diffusion model retraining (for experienced ML practitioners)**
+
+Topics covered:
+- **Foundational Concepts** - How diffusion models learn, knowledge representation, forward/reverse processes
+- **Adaptation Methods** - Fine-tuning, LoRA, DreamBooth, adapters, transfer learning, continual learning
+- **Avoiding Catastrophic Forgetting** - EWC, knowledge distillation, regularization techniques
+- **Layer-Specific Strategies** - UNet architecture breakdown, selective freezing, progressive unfreezing
+- **Hyperparameter Deep Dive** - Learning rates, batch sizes, noise schedules, optimization
+- **Evaluation Methodology** - Retention testing, mode collapse detection, bias assessment
+- **Advanced Techniques** - Gradient surgery, task arithmetic, adaptive loss weighting
+- **Deployment Best Practices** - Weight merging, versioning, integration strategies
+
+**Use this when:**
+- Need deep understanding of diffusion model theory
+- Exploring different retraining strategies (LoRA vs full fine-tuning)
+- Implementing parameter-efficient fine-tuning methods
+- Understanding trade-offs between different approaches
+- Want theoretical foundation for practical GSDiff work
+- Coming from general diffusion model background (Stable Diffusion, etc.)
+
+**Note:** This is a theoretical/educational guide covering general diffusion model concepts. For GSDiff-specific practical workflows, see [RETRAINING_WITH_EXISTING_DATA.md](RETRAINING_WITH_EXISTING_DATA.md).
+
+---
+
 ## 🛠️ Tools
 
 ### [json_to_npy_floodfill.py](json_to_npy_floodfill.py)
@@ -276,11 +301,12 @@ python scripts/trainval_main_unconstrained.py
 
 | File | Type | Purpose | Size |
 |------|------|---------|------|
-| `README_DOCS.md` | Documentation | Master index (this file) | 11KB |
+| `README_DOCS.md` | Documentation | Master index (this file) | 12KB |
 | `PRE_AUGMENTATION_WORKFLOW.md` | Documentation | ⭐ Recommended workflow for custom data | 15KB |
 | `TRAINING_GUIDE.md` | Documentation | Complete training reference | 35KB |
 | `RETRAINING_WITH_EXISTING_DATA.md` | Documentation | ⭐ Retrain with old + new data | 24KB |
 | `DATA_AUGMENTATION_GUIDE.md` | Documentation | Technical augmentation reference | 17KB |
+| `DIFFUSION_MODEL_RETRAINING_THEORY.md` | Documentation | 📖 Theoretical diffusion model guide | 31KB |
 | `json_to_npy_floodfill.py` | Script | JSON → Raster NPY converter | 17KB |
 | `raster_to_graph_converter.py` | Script | Raster NPY → Graph NPY converter | 16KB |
 | `augment_floor_plans.py` | Script | Graph NPY augmentation tool | 14KB |
@@ -367,11 +393,13 @@ A: Check that all NPY files have correct padding (53, ...) shape and validate wi
 
 This branch provides everything needed to:
 - ✅ Understand GSDiff training pipeline
-- ✅ Retrain on custom data
+- ✅ Retrain on custom data (with or without preserving previous knowledge)
+- ✅ Deep theoretical understanding of diffusion model retraining
 - ✅ Increase dataset size with augmentation
 - ✅ Change corner capacity limit
 - ✅ Configure training parameters
 - ✅ Troubleshoot common issues
+- ✅ Learn advanced retraining techniques (LoRA, DreamBooth, EWC, etc.)
 
 **Branch:** `claude/add-documentation-and-tools-011CV5ZXcHng7Pc1J8k7KVsG`
 
