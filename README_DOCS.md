@@ -47,7 +47,30 @@ Topics covered:
 
 ---
 
-### 3. [DATA_AUGMENTATION_GUIDE.md](DATA_AUGMENTATION_GUIDE.md)
+### 3. [RETRAINING_WITH_EXISTING_DATA.md](RETRAINING_WITH_EXISTING_DATA.md) ⭐ NEW
+**How to retrain while preserving knowledge from previous data**
+
+Topics covered:
+- **Two Approaches** - Combined training vs fine-tuning from checkpoint
+- **Step-by-Step Workflows** - Complete examples for both approaches
+- **Checkpoint Loading** - How to resume from saved models
+- **Fine-Tuning Strategy** - Learning rates, steps, and avoiding catastrophic forgetting
+- **Handling Different Corner Counts** - Mixing datasets with different capacities
+- **Training Configuration** - All three stages explained
+- **Monitoring Progress** - Loss curves, FID/KID metrics, validation
+- **Best Practices** - When to combine data vs fine-tune
+- **Complete Example** - Adding 10k new floor plans to existing 65k dataset
+
+**Use this when:**
+- Adding new data to an already-trained model
+- Want to preserve previous knowledge while learning new patterns
+- Have checkpoints from previous training runs
+- Need to retrain without starting completely from scratch
+- Combining multiple datasets (old + new data)
+
+---
+
+### 4. [DATA_AUGMENTATION_GUIDE.md](DATA_AUGMENTATION_GUIDE.md)
 **Data augmentation documentation (1,000+ lines) - Technical reference**
 
 Topics covered:
@@ -67,10 +90,90 @@ Topics covered:
 
 ---
 
+### 5. [DIFFUSION_MODEL_RETRAINING_THEORY.md](DIFFUSION_MODEL_RETRAINING_THEORY.md) 📖 THEORY
+**Deep theoretical guide to diffusion model retraining (for experienced ML practitioners)**
+
+Topics covered:
+- **Foundational Concepts** - How diffusion models learn, knowledge representation, forward/reverse processes
+- **Adaptation Methods** - Fine-tuning, LoRA, DreamBooth, adapters, transfer learning, continual learning
+- **Avoiding Catastrophic Forgetting** - EWC, knowledge distillation, regularization techniques
+- **Layer-Specific Strategies** - UNet architecture breakdown, selective freezing, progressive unfreezing
+- **Hyperparameter Deep Dive** - Learning rates, batch sizes, noise schedules, optimization
+- **Evaluation Methodology** - Retention testing, mode collapse detection, bias assessment
+- **Advanced Techniques** - Gradient surgery, task arithmetic, adaptive loss weighting
+- **Deployment Best Practices** - Weight merging, versioning, integration strategies
+
+**Use this when:**
+- Need deep understanding of diffusion model theory
+- Exploring different retraining strategies (LoRA vs full fine-tuning)
+- Implementing parameter-efficient fine-tuning methods
+- Understanding trade-offs between different approaches
+- Want theoretical foundation for practical GSDiff work
+- Coming from general diffusion model background (Stable Diffusion, etc.)
+
+**Note:** This is a theoretical/educational guide covering general diffusion model concepts. For GSDiff-specific practical workflows, see [RETRAINING_WITH_EXISTING_DATA.md](RETRAINING_WITH_EXISTING_DATA.md).
+
+---
+
 ## 🛠️ Tools
 
+### [json_to_npy_floodfill.py](json_to_npy_floodfill.py)
+**Convert BIM JSON files to raster NPY format (Step 1 of pipeline)**
+
+**Features:**
+- Converts JSON floor plans (BIM format) to raster arrays
+- Uses flood fill algorithm for proper room boundaries
+- Handles walls, doors, and room separation
+- Configurable resolution and wall thickness
+- Creates visualization PNGs for verification
+
+**Quick Example:**
+
+```bash
+# Convert single JSON file
+python json_to_npy_floodfill.py \
+    --input apartment_1.json \
+    --output apartment_1.npy \
+    --resolution 10.0
+
+# Batch convert directory
+python json_to_npy_floodfill.py \
+    --input_dir JSON_files \
+    --output_dir raster_npy_files
+```
+
+**Output:** Raster NPY files (2D arrays where each pixel = room ID)
+
+---
+
+### [raster_to_graph_converter.py](raster_to_graph_converter.py)
+**Convert raster NPY to graph NPY format (Step 2 of pipeline)**
+
+**Features:**
+- Converts raster arrays to GSDiff graph format
+- Extracts corners using OpenCV contour detection
+- Builds adjacency matrices automatically
+- Normalizes coordinates to [-1, 1] range
+- Pads to 53 corners (or custom size)
+- Validates output format
+
+**Quick Example:**
+
+```bash
+# Convert raster NPY files to graph format
+python raster_to_graph_converter.py \
+    --input_dir raster_npy_files \
+    --output_dir datasets/my-custom-floorplans/train \
+    --image_size 2575 \
+    --validate
+```
+
+**Critical:** Must specify `--image_size` matching your raster dimensions!
+
+---
+
 ### [augment_floor_plans.py](augment_floor_plans.py)
-**Geometric data augmentation script**
+**Geometric data augmentation script (Step 3 of pipeline)**
 
 **Features:**
 - Increase dataset by 4× (flips) or 8× (flips + rotations)
@@ -164,7 +267,25 @@ python scripts/trainval_main_unconstrained.py
 4. Regenerate all NPY files
 5. Retrain models with new capacity
 
-### Use Case 3: Retrain on Different Domain
+### Use Case 3: Add New Data While Preserving Old Knowledge
+**Scenario:** You have a trained model on 60k floor plans, want to add 10k new ones
+
+**Solution:**
+```bash
+# Follow RETRAINING_WITH_EXISTING_DATA.md
+
+# Option A: Combine all data (recommended)
+cp new_data/*.npy ../datasets/rplang-v3-withsemantics/train/
+python scripts/trainval_main_unconstrained.py
+
+# Option B: Fine-tune from checkpoint (faster)
+# Modify training script to load checkpoint
+# Set lr = 1e-5 (lower than default 1e-4)
+# Train for 200k steps instead of 1M
+python scripts/trainval_main_unconstrained.py
+```
+
+### Use Case 4: Retrain on Different Domain
 **Scenario:** Train on commercial buildings instead of residential
 
 **Solution:**
@@ -180,11 +301,15 @@ python scripts/trainval_main_unconstrained.py
 
 | File | Type | Purpose | Size |
 |------|------|---------|------|
-| `README_DOCS.md` | Documentation | Master index (this file) | 10KB |
+| `README_DOCS.md` | Documentation | Master index (this file) | 12KB |
 | `PRE_AUGMENTATION_WORKFLOW.md` | Documentation | ⭐ Recommended workflow for custom data | 15KB |
 | `TRAINING_GUIDE.md` | Documentation | Complete training reference | 35KB |
+| `RETRAINING_WITH_EXISTING_DATA.md` | Documentation | ⭐ Retrain with old + new data | 24KB |
 | `DATA_AUGMENTATION_GUIDE.md` | Documentation | Technical augmentation reference | 17KB |
-| `augment_floor_plans.py` | Script | Data augmentation tool | 14KB |
+| `DIFFUSION_MODEL_RETRAINING_THEORY.md` | Documentation | 📖 Theoretical diffusion model guide | 31KB |
+| `json_to_npy_floodfill.py` | Script | JSON → Raster NPY converter | 17KB |
+| `raster_to_graph_converter.py` | Script | Raster NPY → Graph NPY converter | 16KB |
+| `augment_floor_plans.py` | Script | Graph NPY augmentation tool | 14KB |
 
 ---
 
@@ -268,11 +393,13 @@ A: Check that all NPY files have correct padding (53, ...) shape and validate wi
 
 This branch provides everything needed to:
 - ✅ Understand GSDiff training pipeline
-- ✅ Retrain on custom data
+- ✅ Retrain on custom data (with or without preserving previous knowledge)
+- ✅ Deep theoretical understanding of diffusion model retraining
 - ✅ Increase dataset size with augmentation
 - ✅ Change corner capacity limit
 - ✅ Configure training parameters
 - ✅ Troubleshoot common issues
+- ✅ Learn advanced retraining techniques (LoRA, DreamBooth, EWC, etc.)
 
 **Branch:** `claude/add-documentation-and-tools-011CV5ZXcHng7Pc1J8k7KVsG`
 

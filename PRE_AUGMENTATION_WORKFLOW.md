@@ -9,13 +9,15 @@ This guide covers augmenting your dataset **before** placing it in the GSDiff re
 ## Workflow: Augment First, Then Train
 
 ```
-Your Custom Data (JSON/Images)
+Your Custom Data (JSON files)
+    ↓ json_to_npy_floodfill.py
+Raster NPY (2D arrays, ~14-45 MB each)
+    ↓ raster_to_graph_converter.py
+Graph NPY (dictionaries, ~150 KB each)
+    ↓ augment_floor_plans.py
+Augmented Graph NPY (4× or 8×)
     ↓
-Convert to NPY format (with correct image_size)
-    ↓
-Augment NPY files (4× or 8×)
-    ↓
-Place augmented files in datasets/ directory
+Place in datasets/ directory
     ↓
 Train directly (no configuration changes needed)
 ```
@@ -26,21 +28,42 @@ Train directly (no configuration changes needed)
 
 ### Step 1: Convert Your Data to NPY Format
 
-First, convert your custom floor plans to GSDiff NPY format:
+**Two-step conversion process:**
+
+#### Step 1a: JSON → Raster NPY (if starting from JSON)
 
 ```bash
-# Using the raster-to-graph converter
-python raster_to_graph_converter.py \
-    --input_dir /path/to/your/json_or_raster_files \
-    --output_dir converted_npy \
-    --image_size 2575 \  # Use your actual raster size!
-    --validate
+# Convert JSON floor plans to raster arrays
+python json_to_npy_floodfill.py \
+    --input_dir /path/to/your/json_files \
+    --output_dir raster_npy \
+    --resolution 10.0
 
-# Verify conversion succeeded
-ls -lh converted_npy/
+# Verify raster files created
+ls -lh raster_npy/
+# Should see large files (14-45 MB) - these are 2D pixel arrays
 ```
 
-**Result:** You now have NPY files in correct GSDiff format (e.g., `0.npy`, `1.npy`, `2.npy`, ...)
+**Result:** Raster NPY files where each pixel = room ID
+
+#### Step 1b: Raster NPY → Graph NPY
+
+```bash
+# Convert raster arrays to GSDiff graph format
+python raster_to_graph_converter.py \
+    --input_dir raster_npy \
+    --output_dir converted_graph_npy \
+    --image_size 2575 \  # CRITICAL: Must match your raster dimensions!
+    --validate
+
+# Verify graph files created
+ls -lh converted_graph_npy/
+# Should see small files (~150 KB) - these are graph dictionaries
+```
+
+**Result:** Graph NPY files in GSDiff format (e.g., `0.npy`, `1.npy`, `2.npy`, ...)
+
+**Alternative:** If you already have raster NPY files, skip Step 1a and start with Step 1b.
 
 ### Step 2: Augment the Converted Files
 
@@ -420,16 +443,22 @@ GSDiff/
 ### Complete Workflow (Copy-Paste Ready)
 
 ```bash
-# 1. Convert your data to NPY
+# 1a. Convert JSON to Raster NPY (if starting from JSON)
+python json_to_npy_floodfill.py \
+    --input_dir /path/to/your/json_files \
+    --output_dir raster_npy \
+    --resolution 10.0
+
+# 1b. Convert Raster NPY to Graph NPY
 python raster_to_graph_converter.py \
-    --input_dir /path/to/your/data \
-    --output_dir converted_npy \
+    --input_dir raster_npy \
+    --output_dir converted_graph_npy \
     --image_size 2575 \
     --validate
 
 # 2. Augment (8× increase)
 python augment_floor_plans.py \
-    --input_dir converted_npy \
+    --input_dir converted_graph_npy \
     --output_dir augmented_npy \
     --full \
     --create_manifest
@@ -442,10 +471,10 @@ mkdir -p datasets/my-custom-floorplans/{train,val,test}
 cp augmented_npy/{0..699}_*.npy datasets/my-custom-floorplans/train/
 
 # Val: Original files only from groups 700-849
-cp converted_npy/{700..849}.npy datasets/my-custom-floorplans/val/
+cp converted_graph_npy/{700..849}.npy datasets/my-custom-floorplans/val/
 
 # Test: Original files only from groups 850-999
-cp converted_npy/{850..999}.npy datasets/my-custom-floorplans/test/
+cp converted_graph_npy/{850..999}.npy datasets/my-custom-floorplans/test/
 
 # 5. Generate CNN features (if using boundary constraint)
 python create_cnn_featuremaps.py \
