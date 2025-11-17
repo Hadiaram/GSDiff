@@ -29,7 +29,7 @@ def create_featuremaps_for_directory(test_data_dir, output_dir, max_corners=150)
     output_path.mkdir(parents=True, exist_ok=True)
 
     # Get all NPY files in test directory
-    test_files = sorted(test_data_path.glob('*.npy'), key=lambda x: int(x.stem))
+    test_files = sorted(test_data_path.glob('*.npy'))
 
     if len(test_files) == 0:
         print(f"No NPY files found in {test_data_dir}")
@@ -73,7 +73,7 @@ def create_withboundary_files(test_data_dir, output_dir, max_corners=150):
     output_path.mkdir(parents=True, exist_ok=True)
 
     # Get all NPY files in test directory
-    test_files = sorted(test_data_path.glob('*.npy'), key=lambda x: int(x.stem))
+    test_files = sorted(test_data_path.glob('*.npy'))
 
     if len(test_files) == 0:
         print(f"No NPY files found in {test_data_dir}")
