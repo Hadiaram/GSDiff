@@ -342,10 +342,10 @@ def convert_raster_to_graph(raster_file, output_file, image_size=256, max_corner
 
     g['semantics'] = semantics
 
-    # Create corner_list_np_normalized_padding_withsemantics (53, 16)
+    # Create corner_list_np_normalized_padding_withsemantics (max_corners, 16)
     # First 2 columns: normalized coordinates
     # Next 14 columns: semantic vectors
-    result = np.zeros((53, 16), dtype=np.float64)
+    result = np.zeros((max_corners, 16), dtype=np.float64)
 
     for idx, (coord, rounded) in enumerate(zip(corner_list_np_normalized, rounded_corners)):
         if rounded in corner_to_rooms:
@@ -396,7 +396,7 @@ def batch_convert(input_dir, output_dir, image_size=256, max_corners=150):
     print(f"\nSuccessfully converted {success_count}/{len(npy_files)} files")
 
 
-def validate_converted_file(filepath):
+def validate_converted_file(filepath, max_corners=150):
     """Validate that a converted file has the correct GSDiff format."""
     try:
         data = np.load(filepath, allow_pickle=True)
@@ -428,13 +428,13 @@ def validate_converted_file(filepath):
 
         # Check shapes
         corners = graph['corner_list_np_normalized_padding_withsemantics']
-        if corners.shape != (53, 16):
-            print(f"❌ FAIL: {filepath} - Wrong corners shape: {corners.shape}")
+        if corners.shape != (max_corners, 16):
+            print(f"❌ FAIL: {filepath} - Wrong corners shape: {corners.shape}, expected ({max_corners}, 16)")
             return False
 
         padding_mask = graph['padding_mask']
-        if padding_mask.shape != (53, 1):
-            print(f"❌ FAIL: {filepath} - Wrong padding_mask shape: {padding_mask.shape}")
+        if padding_mask.shape != (max_corners, 1):
+            print(f"❌ FAIL: {filepath} - Wrong padding_mask shape: {padding_mask.shape}, expected ({max_corners}, 1)")
             return False
 
         print(f"✅ PASS: {filepath}")
@@ -468,5 +468,5 @@ if __name__ == '__main__':
         print("\nValidating converted files...")
         output_path = Path(args.output_dir)
         npy_files = list(output_path.glob('*.npy'))
-        passed = sum(1 for f in npy_files if validate_converted_file(f))
+        passed = sum(1 for f in npy_files if validate_converted_file(f, args.max_corners))
         print(f"\n{passed}/{len(npy_files)} files passed validation")
