@@ -257,6 +257,47 @@ graph_npy_split/
 
 ---
 
+### [create_cnn_featuremaps.py](create_cnn_featuremaps.py)
+**Generate CNN feature maps for boundary-constrained testing**
+
+**Features:**
+- Creates dummy CNN feature maps for testing boundary-constrained models
+- Generates withboundary files for test datasets
+- Configurable corner capacity (default: 150)
+- Matches test data file names automatically
+
+**Quick Examples:**
+
+```bash
+# Create feature maps for test data
+python create_cnn_featuremaps.py --test_dir datasets/test
+
+# With custom corner limit
+python create_cnn_featuremaps.py \
+    --test_dir datasets/test \
+    --max_corners 150
+
+# Also create withboundary files
+python create_cnn_featuremaps.py \
+    --test_dir datasets/test \
+    --create_withboundary
+
+# Custom output directories
+python create_cnn_featuremaps.py \
+    --test_dir datasets/test \
+    --feature_dir my_features \
+    --withboundary_dir my_withboundary
+```
+
+**When to use:**
+- Running boundary-constrained model testing (`test_boun.py`)
+- Need CNN feature maps but don't have trained CNN encoder
+- Quick testing/debugging of boundary-constrained generation
+
+**Note:** Creates **dummy/random** feature maps for testing only. For real experiments, train CNN boundary encoder with `scripts/train-CNN-autoe-final.py`.
+
+---
+
 ## 🚀 Quick Start Guide
 
 ### For Training New Models
@@ -356,6 +397,7 @@ python scripts/trainval_main_unconstrained.py
 | `raster_to_graph_converter.py` | Script | Raster NPY → Graph NPY converter | 16KB |
 | `augment_floor_plans.py` | Script | Graph NPY augmentation tool | 14KB |
 | `split_dataset.py` | Script | Train/val/test splitter | 6KB |
+| `create_cnn_featuremaps.py` | Script | CNN feature map generator (for testing) | 5KB |
 
 ---
 
