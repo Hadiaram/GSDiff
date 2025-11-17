@@ -120,8 +120,9 @@ while step < total_steps:
     corners_padding2_mask = padding2_sample.reshape(batch_size, 53, 1).to(corners_padding_mask.dtype)
     noisy_corners_padding_mask = corners_padding2_mask - corners_padding_mask
 
-    corners = corners + truncated_normal(torch.empty((batch_size, 53, 2), dtype=corners.dtype, device=corners.device),
-                                     0, 1, -1, 1, dtype=corners.dtype, device=corners.device) * noisy_corners_padding_mask.expand(batch_size, 53, 2)
+    max_corners = corners.size(1)  # Dynamic corner count (150)
+    corners = corners + truncated_normal(torch.empty((batch_size, max_corners, 2), dtype=corners.dtype, device=corners.device),
+                                     0, 1, -1, 1, dtype=corners.dtype, device=corners.device) * noisy_corners_padding_mask.expand(batch_size, max_corners, 2)
     semantics = semantics + torch.randint(low=0, high=1+1, size=semantics.shape, dtype=semantics.dtype, device=semantics.device) * noisy_corners_padding_mask.expand(batch_size, 53, 7)
     # global_attn_matrix(bs, 53, 53)
     corners_padding_mask = corners_padding2_mask
@@ -133,7 +134,8 @@ while step < total_steps:
     sigma = 1 / 128
     lower = -3 * sigma
     upper = 3 * sigma
-    corners_noise = truncated_normal(torch.empty((batch_size, 53, 2), dtype=corners.dtype, device=corners.device),
+    max_corners = corners.size(1)  # Dynamic corner count (150)
+    corners_noise = truncated_normal(torch.empty((batch_size, max_corners, 2), dtype=corners.dtype, device=corners.device),
                                      mu, sigma, lower, upper, dtype=corners.dtype, device=corners.device)
     corners = corners + corners_noise  # Truncated Gaussian noise -> The standard deviation corresponds to the same normalization multiple as the corner points
 

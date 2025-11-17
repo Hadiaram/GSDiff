@@ -431,8 +431,9 @@ while step < total_steps:
     distance_matrix_x[torch.isinf(distance_matrix_x) | torch.isnan(distance_matrix_x)] = 99999
     distance_matrix_y[torch.isinf(distance_matrix_y) | torch.isnan(distance_matrix_y)] = 99999
     # Diagonal lines are filled with mask 99999
-    distance_matrix_x[(torch.eye(53).unsqueeze(0) == 1).to(device).expand(distance_matrix_x.size(0), 53, 53)] = 99999
-    distance_matrix_y[(torch.eye(53).unsqueeze(0) == 1).to(device).expand(distance_matrix_y.size(0), 53, 53)] = 99999
+    max_corners = distance_matrix_x.size(1)  # Dynamic corner count (150)
+    distance_matrix_x[(torch.eye(max_corners).unsqueeze(0) == 1).to(device).expand(distance_matrix_x.size(0), max_corners, max_corners)] = 99999
+    distance_matrix_y[(torch.eye(max_corners).unsqueeze(0) == 1).to(device).expand(distance_matrix_y.size(0), max_corners, max_corners)] = 99999
     # print(distance_matrix_x)
     # print(distance_matrix_y)
     # Calculate the minimum of all x, y axial distances for each node i
@@ -474,7 +475,7 @@ while step < total_steps:
     # Sum the results
     local_aligned_loss = masked_tensor_bin + masked_tensor_four + masked_tensor_eight + masked_tensor_sxt + masked_tensor_inf
 
-    corner_number = torch.ones((batch_size,), device=device) * 53
+    corner_number = torch.ones((batch_size,), device=device) * 150
     corners_loss_masked_avgpergraph1 = corners_loss_masked1.sum(dim=[1, 2]) / corner_number
     # corners_loss_masked_avgpergraph2 = corners_loss_masked2.sum(dim=[1, 2]) / corner_number
     corners_loss_batch1 = corners_loss_masked_avgpergraph1.mean()

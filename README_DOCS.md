@@ -47,7 +47,30 @@ Topics covered:
 
 ---
 
-### 3. [RETRAINING_WITH_EXISTING_DATA.md](RETRAINING_WITH_EXISTING_DATA.md) ⭐ NEW
+### 3. [BOUNDARY_CONSTRAINED_TRAINING_150.md](BOUNDARY_CONSTRAINED_TRAINING_150.md) ⭐ READY TO TRAIN
+**Complete workflow for boundary-constrained training with 150 corners**
+
+Topics covered:
+- **Complete Step-by-Step Workflow** - From data organization to testing
+- **Directory Structure** - Exact paths and organization required
+- **Support File Generation** - CNN feature maps and withboundary files
+- **Training Configuration** - Hyperparameters, paths, and GPU settings
+- **Stage 1 & Stage 2 Training** - Detailed instructions for both stages
+- **Updated Scripts** - All 6 files updated from 53 to 150 corners
+- **Testing & Evaluation** - How to test trained models
+- **Troubleshooting** - Common issues and solutions
+- **Performance Optimization** - Memory usage and training speed tips
+
+**Use this when:**
+- You have 1000+ augmented files ready for training
+- Want to use boundary-constrained variant (more accurate)
+- Need 150-corner capacity for complex floor plans
+- Ready to start training right now
+- Have split data into train/val/test
+
+---
+
+### 4. [RETRAINING_WITH_EXISTING_DATA.md](RETRAINING_WITH_EXISTING_DATA.md) ⭐
 **How to retrain while preserving knowledge from previous data**
 
 Topics covered:
@@ -70,7 +93,7 @@ Topics covered:
 
 ---
 
-### 4. [DATA_AUGMENTATION_GUIDE.md](DATA_AUGMENTATION_GUIDE.md)
+### 5. [DATA_AUGMENTATION_GUIDE.md](DATA_AUGMENTATION_GUIDE.md)
 **Data augmentation documentation (1,000+ lines) - Technical reference**
 
 Topics covered:
@@ -90,7 +113,7 @@ Topics covered:
 
 ---
 
-### 5. [DIFFUSION_MODEL_RETRAINING_THEORY.md](DIFFUSION_MODEL_RETRAINING_THEORY.md) 📖 THEORY
+### 6. [DIFFUSION_MODEL_RETRAINING_THEORY.md](DIFFUSION_MODEL_RETRAINING_THEORY.md) 📖 THEORY
 **Deep theoretical guide to diffusion model retraining (for experienced ML practitioners)**
 
 Topics covered:
@@ -390,6 +413,7 @@ python scripts/trainval_main_unconstrained.py
 | `README_DOCS.md` | Documentation | Master index (this file) | 13KB |
 | `PRE_AUGMENTATION_WORKFLOW.md` | Documentation | ⭐ Recommended workflow for custom data | 15KB |
 | `TRAINING_GUIDE.md` | Documentation | Complete training reference | 35KB |
+| `BOUNDARY_CONSTRAINED_TRAINING_150.md` | Documentation | ⭐ Boundary-constrained 150-corner workflow | 18KB |
 | `RETRAINING_WITH_EXISTING_DATA.md` | Documentation | ⭐ Retrain with old + new data | 24KB |
 | `DATA_AUGMENTATION_GUIDE.md` | Documentation | Technical augmentation reference | 17KB |
 | `DIFFUSION_MODEL_RETRAINING_THEORY.md` | Documentation | 📖 Theoretical diffusion model guide | 31KB |
@@ -398,6 +422,8 @@ python scripts/trainval_main_unconstrained.py
 | `augment_floor_plans.py` | Script | Graph NPY augmentation tool | 14KB |
 | `split_dataset.py` | Script | Train/val/test splitter | 6KB |
 | `create_cnn_featuremaps.py` | Script | CNN feature map generator (for testing) | 5KB |
+
+**Total: 12 files** (7 documentation guides + 5 Python scripts)
 
 ---
 

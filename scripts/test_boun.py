@@ -342,20 +342,21 @@ if __name__ == '__main__':
 
             for test_count in tqdm(range(len(dataset_test))):
                 '''a batch of data'''
-                corners_stage2_test = torch.zeros((1, 53, 2), dtype=torch.float64, device=device)
+                max_corners = 150  # Updated corner capacity
+                corners_stage2_test = torch.zeros((1, max_corners, 2), dtype=torch.float64, device=device)
                 corners_temp_stage2_test = (torch.tensor(corners_all_samples_test[test_count], dtype=torch.float64,
                                                          device=device) - (resolution // 2)) / (resolution // 2)
                 corners_stage2_test[:, 0:corners_temp_stage2_test.shape[1], :] = corners_temp_stage2_test
 
-                semantics_stage2_test = torch.zeros((1, 53, 7), dtype=torch.float64, device=device)
+                semantics_stage2_test = torch.zeros((1, max_corners, 7), dtype=torch.float64, device=device)
                 semantics_temp_stage2_test = torch.tensor(semantics_all_samples_test[test_count], dtype=torch.float64,
                                                           device=device)
                 semantics_stage2_test[:, 0:semantics_temp_stage2_test.shape[1], :] = semantics_temp_stage2_test
 
-                global_attn_matrix_stage2_test = torch.zeros((1, 53, 53), dtype=torch.bool, device=device)
+                global_attn_matrix_stage2_test = torch.zeros((1, max_corners, max_corners), dtype=torch.bool, device=device)
                 global_attn_matrix_stage2_test[:, 0:corners_temp_stage2_test.shape[1],
                 0:corners_temp_stage2_test.shape[1]] = True
-                corners_padding_mask_stage2_test = torch.zeros((1, 53, 1), dtype=torch.uint8, device=device)
+                corners_padding_mask_stage2_test = torch.zeros((1, max_corners, 1), dtype=torch.uint8, device=device)
                 corners_padding_mask_stage2_test[:, 0:corners_temp_stage2_test.shape[1], :] = 1
 
                 '''model: Edge transformer'''
