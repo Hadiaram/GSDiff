@@ -311,7 +311,9 @@ step = 0
 # loss_curve = []
 # val_metrics = []
 
-interval = 1000000 # real config
+best_loss = float('inf')  # Track best loss for saving best model
+
+interval = 5000  # Save checkpoint every 5000 steps
 while step < total_steps:
     '''a batch of data'''
     # feat_64, feat_32, feat_16, corners_withsemantics_0, global_attn_matrix, corners_padding_mask = next(dataloader_train_iter)
@@ -509,15 +511,27 @@ while step < total_steps:
     #      masked_tensor_bin.item() * 100000, masked_tensor_four.item() * 100000, masked_tensor_eight.item() * 100000,
     #      masked_tensor_sxt.item() * 100000,  masked_tensor_inf.item() * 100000])
 
-    '''save model per interval steps'''
-    if step % interval == 0:
+    '''save best model (overwriting) if loss improved'''
+    current_loss = loss_batch.item()
+    if current_loss < best_loss:
+        best_loss = current_loss
+        state_dict = model.state_dict()
+        for i, (name, _value) in enumerate(model.named_parameters()):
+            state_dict[name] = list(model.parameters())[i]
+        torch.save(state_dict, output_dir + "model_best.pt")
+        torch.save(optimizer.state_dict(), output_dir + "optim_best.pt")
+        print(f'  -> New best model saved! Loss: {best_loss * 100000:.2f}')
+
+    '''save checkpoint every interval steps'''
+    if step % interval == 0 and step > 0:
         state_dict = model.state_dict()
         for i, (name, _value) in enumerate(model.named_parameters()):
             state_dict[name] = list(model.parameters())[i]
         torch.save(state_dict, output_dir + f"model{step:07d}.pt")
         torch.save(optimizer.state_dict(), output_dir + f"optim{step:07d}.pt")
+        print(f'  -> Checkpoint saved at step {step}')
         '''saving loss curve'''
-        np.save(output_dir + 'loss_curve.npy', np.array(loss_curve))
+        # np.save(output_dir + 'loss_curve.npy', np.array(loss_curve))
 
     '''evaluate per interval steps'''
     if step % interval == 0:
