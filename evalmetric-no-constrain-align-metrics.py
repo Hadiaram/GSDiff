@@ -6,7 +6,7 @@ from tqdm import *
 '''This is used to calculate the alignment loss and false edge ratio for 3000 unconstrained inference results (corresponding to the ablation experiment part in the paper)'''
 
 batch_size = 1
-device = 'cpu'
+device = 'cuda:0'  # Use GPU for faster computation
 
 # Initialize a dictionary to store all FID and KID values ​​and alignment losses
 metrics_dict = {}

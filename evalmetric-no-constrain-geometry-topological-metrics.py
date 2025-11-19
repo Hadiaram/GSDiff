@@ -23,7 +23,7 @@ from house_diffusion.utils import *
 
 
 batch_size = 1
-device = 'cpu'
+device = 'cuda:0'  # Use GPU for faster computation
 import os
 from torch.utils.data import Dataset
 import torch
