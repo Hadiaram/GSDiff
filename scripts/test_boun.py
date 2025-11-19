@@ -38,7 +38,7 @@ if __name__ == '__main__':
 
 
     '''create output_dir'''
-    output_dir = os.path.join('test_outputs', 'AP-1') + os.sep  # Keep trailing separator for consistency
+    output_dir = os.path.join('test_outputs', 'AP-1')
     if os.path.exists(output_dir):
         shutil.rmtree(output_dir)
     os.makedirs(output_dir, exist_ok=True)
@@ -73,18 +73,18 @@ if __name__ == '__main__':
 
     '''Data'''
     dataset_test = RPlanGEdgeSemanSimplified_81('test')
-    dataloader_test = DataLoader(dataset_test, batch_size=batch_size_test, shuffle=False, num_workers=0,
-                            drop_last=False, pin_memory=False)  # try different num_workers to be faster
+    dataloader_test = DataLoader(dataset_test, batch_size=batch_size_test, shuffle=False, num_workers=4,
+                            drop_last=False, pin_memory=True)  # Optimized for Linux
     dataloader_test_iter = iter(cycle(dataloader_test))
 
     dataset_test_for_gt_rendering = RPlanGEdgeSemanSimplified('test')
-    dataloader_test_for_gt_rendering = DataLoader(dataset_test_for_gt_rendering, batch_size=batch_size_test, shuffle=False, num_workers=0,
-                            drop_last=False, pin_memory=False)  # try different num_workers to be faster
+    dataloader_test_for_gt_rendering = DataLoader(dataset_test_for_gt_rendering, batch_size=batch_size_test, shuffle=False, num_workers=4,
+                            drop_last=False, pin_memory=True)  # Optimized for Linux
     dataloader_test_iter_for_gt_rendering = iter(cycle(dataloader_test_for_gt_rendering))
 
 
     '''In order to calculate such as FID and KID on the test set, the test set needs to be rendered first.'''
-    gt_dir_test = os.path.join(output_dir, 'test_gt') + os.sep  # Keep trailing separator for consistency
+    gt_dir_test = os.path.join(output_dir, 'test_gt')
     if os.path.exists(gt_dir_test):
         shutil.rmtree(gt_dir_test)
     os.makedirs(gt_dir_test)
@@ -378,7 +378,7 @@ if __name__ == '__main__':
 
                 # Use basename to extract model name
                 model_name = os.path.basename(model_path_CDDPM).replace('.pt', '')
-                output_dir_test = os.path.join(output_dir, 'test_' + model_name) + os.sep
+                output_dir_test = os.path.join(output_dir, 'test_' + model_name)
                 if os.path.exists(output_dir_test):
                     shutil.rmtree(output_dir_test)
                 os.makedirs(output_dir_test)
