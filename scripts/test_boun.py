@@ -3,10 +3,12 @@ import sys
 import cv2
 from PIL import Image, ImageDraw
 
-sys.path.insert(0, r'C:\Users\hmbashir\AI Training\GSDiff') # Modify it yourself
-sys.path.insert(0, r'C:\Users\hmbashir\AI Training\GSDiff\datasets') # Modify it yourself
-sys.path.insert(0, r'C:\Users\hmbashir\AI Training\GSDiff\gsdiff') # Modify it yourself
-sys.path.insert(0, r'C:\Users\hmbashir\AI Training\GSDiff\scripts\metrics') # Modify it yourself
+# Add project paths to Python path (cross-platform)
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, project_root)
+sys.path.insert(0, os.path.join(project_root, 'datasets'))
+sys.path.insert(0, os.path.join(project_root, 'gsdiff'))
+sys.path.insert(0, os.path.join(project_root, 'scripts', 'metrics'))
 
 
 import math
@@ -158,7 +160,7 @@ if __name__ == '__main__':
 
 
     # Loading the trained edge model
-    model_path_EdgeModel = r"C:\Users\hmbashir\AI Training\GSDiff\scripts\outputs\structure-56-36-interval1000\model_stage2_best_065000.pt"
+    model_path_EdgeModel = "outputs/structure-56-36-interval1000/model_stage2_best_065000.pt"
     model_EdgeModel = BoundEdgeModel().to(device)
     model_EdgeModel.load_state_dict(torch.load(model_path_EdgeModel, map_location=device))
     for param in model_EdgeModel.parameters():
@@ -166,9 +168,9 @@ if __name__ == '__main__':
 
     # DDPM
     test_metrics = []
-    # NEW (manual path):
-    model_path_CDDPMs = [os.path.join(r'C:\Users\hmbashir\AI Training\GSDiff\scripts\outputs\structure-81-106-3', fn) 
-                        for fn in os.listdir(r'C:\Users\hmbashir\AI Training\GSDiff\scripts\outputs\structure-81-106-3') 
+    # Load model paths from outputs directory
+    model_path_CDDPMs = [os.path.join('outputs/structure-81-106-3', fn)
+                        for fn in os.listdir('outputs/structure-81-106-3')
                         if 'model' in fn and '.pt' in fn]
     for model_path_CDDPM in model_path_CDDPMs:
         # Extract model number from filename (e.g., 'model1000000.pt' -> '100')

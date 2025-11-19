@@ -510,16 +510,14 @@ while step < total_steps:
     #      masked_tensor_sxt.item() * 100000,  masked_tensor_inf.item() * 100000])
 
     '''save model per interval steps'''
-    # if step % interval == 0:
-    if 1:
+    if step % interval == 0:
         state_dict = model.state_dict()
         for i, (name, _value) in enumerate(model.named_parameters()):
             state_dict[name] = list(model.parameters())[i]
         torch.save(state_dict, output_dir + f"model{step:07d}.pt")
         torch.save(optimizer.state_dict(), output_dir + f"optim{step:07d}.pt")
-        assert 0
         '''saving loss curve'''
-        # np.save(output_dir + 'loss_curve.npy', np.array(loss_curve))
+        np.save(output_dir + 'loss_curve.npy', np.array(loss_curve))
 
     '''evaluate per interval steps'''
     if step % interval == 0:
