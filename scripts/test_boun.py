@@ -376,7 +376,7 @@ if __name__ == '__main__':
                 edges_all_samples_test = edges_remove_padding(results_stage2_test['results_edges_' + str(k_test)],
                                                               results_stage2_test['results_corners_numbers_' + str(k_test)])
 
-                # Use basename to extract model name (works on both Windows and Unix)
+                # Use basename to extract model name
                 model_name = os.path.basename(model_path_CDDPM).replace('.pt', '')
                 output_dir_test = os.path.join(output_dir, 'test_' + model_name) + os.sep
                 if os.path.exists(output_dir_test):
