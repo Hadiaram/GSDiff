@@ -17,11 +17,11 @@ class RPlanGEdgeSemanSimplified_81(Dataset):
         self.mode = mode
         '''train(65763) & val(3000) & test(3000)'''
         if self.mode == 'train':
-            self.files = os.listdir(get_data_path('rplang-v3-withsemantics-withboundary', 'train'))
+            self.files = [f for f in os.listdir(get_data_path('rplang-v3-withsemantics-withboundary', 'train')) if f.endswith('.npy')]
         elif self.mode == 'val':
-            self.files = os.listdir(get_data_path('rplang-v3-withsemantics-withboundary', 'val'))
+            self.files = [f for f in os.listdir(get_data_path('rplang-v3-withsemantics-withboundary', 'val')) if f.endswith('.npy')]
         elif self.mode == 'test':
-            self.files = os.listdir(get_data_path('rplang-v3-withsemantics-withboundary', 'test'))
+            self.files = [f for f in os.listdir(get_data_path('rplang-v3-withsemantics-withboundary', 'test')) if f.endswith('.npy')]
         else:
             assert 0, 'mode error'
         # Sort by filename (supports both numeric and descriptive names)
