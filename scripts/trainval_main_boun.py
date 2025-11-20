@@ -564,7 +564,7 @@ if __name__ == '__main__':
             # np.save(output_dir + 'loss_curve.npy', np.array(loss_curve))
 
         '''evaluate per interval steps'''
-        if step % interval == 0:  # Re-enabled with corrected path to stage-2 model
+        if False:  # Validation disabled
             model.eval()
 
 
