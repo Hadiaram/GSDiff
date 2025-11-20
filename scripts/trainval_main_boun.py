@@ -45,7 +45,7 @@ merge_points = True
 clamp_trick_training = True
 
 # Performance optimizations
-num_workers = 4  # Multi-threaded data loading (adjust based on CPU cores)
+num_workers = 8  # Multi-threaded data loading (adjust based on CPU cores)
 use_amp = True  # Mixed precision training for ~2x speedup
 gradient_accumulation_steps = 1  # Accumulate gradients over N steps
 
@@ -181,25 +181,6 @@ def map_to_sxtnary(tensor):
 # assert 0
 
 if __name__ == '__main__':
-    '''Fix multiprocessing shared memory issue'''
-    import multiprocessing
-    # Use file_system instead of shared memory for DataLoader workers
-    # This prevents "No space left on device" errors in /dev/shm
-    try:
-        multiprocessing.set_start_method('spawn', force=True)
-    except RuntimeError:
-        pass  # Already set
-    
-    # Check /dev/shm space (Linux only)
-    import shutil as shutil_disk
-    try:
-        shm_stats = shutil_disk.disk_usage('/dev/shm')
-        print(f'/dev/shm space: {shm_stats.free / 1e9:.2f} GB free / {shm_stats.total / 1e9:.2f} GB total')
-        if shm_stats.free < 1e9:  # Less than 1GB free
-            print('WARNING: /dev/shm has low space. Consider using num_workers=0 or increasing --shm-size in Docker')
-    except:
-        pass  # Not Linux or /dev/shm not available
-    
     '''create output_dir'''
     output_dir = 'outputs/structure-81-106-3/'
     os.makedirs(output_dir, exist_ok=True)
@@ -234,38 +215,15 @@ if __name__ == '__main__':
 
     '''Data'''
     dataset_train = RPlanGEdgeSemanSimplified_81('train')
+    dataloader_train = DataLoader(dataset_train, batch_size=batch_size, shuffle=True, num_workers=num_workers,
+                            drop_last=True, pin_memory=True, persistent_workers=True if num_workers > 0 else False,
+                            prefetch_factor=2 if num_workers > 0 else None)  # Optimized for GPU with async data loading
+    dataloader_train_iter = iter(cycle(dataloader_train))
     dataset_val = RPlanGEdgeSemanSimplified_81('val')
-    
-    # Try to create DataLoader with multiprocessing, fall back to single process if it fails
-    try:
-        print(f'Creating DataLoader with num_workers={num_workers}...')
-        dataloader_train = DataLoader(dataset_train, batch_size=batch_size, shuffle=True, num_workers=num_workers,
-                                drop_last=True, pin_memory=True, persistent_workers=True if num_workers > 0 else False,
-                                prefetch_factor=2 if num_workers > 0 else None,
-                                multiprocessing_context='spawn' if num_workers > 0 else None)  # Optimized for GPU with async data loading
-        dataloader_train_iter = iter(cycle(dataloader_train))
-        print(f'Training DataLoader created successfully with {num_workers} workers')
-        
-        dataloader_val = DataLoader(dataset_val, batch_size=batch_size_val, shuffle=False, num_workers=num_workers,
-                                drop_last=False, pin_memory=True, persistent_workers=True if num_workers > 0 else False,
-                                prefetch_factor=2 if num_workers > 0 else None,
-                                multiprocessing_context='spawn' if num_workers > 0 else None)  # Optimized for GPU with async data loading
-        dataloader_val_iter = iter(cycle(dataloader_val))
-        print(f'Validation DataLoader created successfully with {num_workers} workers')
-    except (OSError, RuntimeError) as e:
-        print(f'WARNING: Failed to create DataLoader with num_workers={num_workers}')
-        print(f'Error: {e}')
-        print('Falling back to num_workers=0 (single-process data loading)')
-        print('Note: Training will be slower. To fix, increase Docker --shm-size or use tmpfs mount')
-        
-        # Fallback to single-process loading
-        dataloader_train = DataLoader(dataset_train, batch_size=batch_size, shuffle=True, num_workers=0,
-                                drop_last=True, pin_memory=True)  # Single process fallback
-        dataloader_train_iter = iter(cycle(dataloader_train))
-        
-        dataloader_val = DataLoader(dataset_val, batch_size=batch_size_val, shuffle=False, num_workers=0,
-                                drop_last=False, pin_memory=True)  # Single process fallback
-        dataloader_val_iter = iter(cycle(dataloader_val))
+    dataloader_val = DataLoader(dataset_val, batch_size=batch_size_val, shuffle=False, num_workers=num_workers,
+                            drop_last=False, pin_memory=True, persistent_workers=True if num_workers > 0 else False,
+                            prefetch_factor=2 if num_workers > 0 else None)  # Optimized for GPU with async data loading
+    dataloader_val_iter = iter(cycle(dataloader_val))
 
     # TEMPORARILY DISABLED: Validation rendering hangs with fully connected edges
     # TODO: Re-enable after implementing proper edge generation based on spatial proximity
