@@ -694,8 +694,16 @@ if __name__ == '__main__':
             # print(corners_all_samples_val)
             # print(semantics_all_samples_val)
 
-            # model 2 loading
-            model_path_2 = 'scripts/outputs/structure-81-106-3/model_stage2_best_010300.pt'
+            # model 2 loading - find most recent checkpoint
+            stage2_dir = 'scripts/outputs/structure-81-106-3/'
+            stage2_checkpoints = [f for f in os.listdir(stage2_dir) if f.startswith('model') and f.endswith('.pt') and 'best' not in f]
+            if not stage2_checkpoints:
+                raise FileNotFoundError(f"No stage 2 checkpoints found in {stage2_dir}")
+            # Sort by step number (7-digit format: model0005000.pt, model0010000.pt, etc.)
+            stage2_checkpoints.sort(key=lambda x: int(x.replace('model', '').replace('.pt', '')))
+            most_recent = stage2_checkpoints[-1]
+            model_path_2 = os.path.join(stage2_dir, most_recent)
+            print(f"Loading stage 2 model from: {model_path_2}")
             model_2 = EdgeModel().to(device)
             model_2.load_state_dict(torch.load(model_path_2, map_location="cpu"))
             model_2.to(device)
