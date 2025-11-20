@@ -324,7 +324,7 @@ if __name__ == '__main__':
     print('Mixed precision training enabled (FP16) for ~2x speedup')
     
     '''Resume from checkpoint'''
-    resume_step = 10000  # Set to 0 to start from scratch, or checkpoint step number to resume
+    resume_step = 15000  # Set to 0 to start from scratch, or checkpoint step number to resume
     if resume_step > 0:
         checkpoint_path = output_dir + f"model{resume_step:07d}.pt"
         optim_path = output_dir + f"optim{resume_step:07d}.pt"
