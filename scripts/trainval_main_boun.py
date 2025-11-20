@@ -210,11 +210,11 @@ if __name__ == '__main__':
 
     '''Data'''
     dataset_train = RPlanGEdgeSemanSimplified_81('train')
-    dataloader_train = DataLoader(dataset_train, batch_size=batch_size, shuffle=True, num_workers=4,
+    dataloader_train = DataLoader(dataset_train, batch_size=batch_size, shuffle=True, num_workers=0,
                             drop_last=True, pin_memory=True)  # Optimized for Linux/GPU
     dataloader_train_iter = iter(cycle(dataloader_train))
     dataset_val = RPlanGEdgeSemanSimplified_81('val')
-    dataloader_val = DataLoader(dataset_val, batch_size=batch_size_val, shuffle=False, num_workers=4,
+    dataloader_val = DataLoader(dataset_val, batch_size=batch_size_val, shuffle=False, num_workers=0,
                             drop_last=False, pin_memory=True)  # Optimized for Linux/GPU
     dataloader_val_iter = iter(cycle(dataloader_val))
 
