@@ -17,14 +17,20 @@ class RPlanGEdgeSemanSimplified_81(Dataset):
         self.mode = mode
         '''train(65763) & val(3000) & test(3000)'''
         if self.mode == 'train':
-            self.files = os.listdir(get_data_path('rplang-v3-withsemantics-withboundary', 'train'))
+            self.files = [f for f in os.listdir(get_data_path('rplang-v3-withsemantics-withboundary', 'train')) if f.endswith('.npy')]
         elif self.mode == 'val':
-            self.files = os.listdir(get_data_path('rplang-v3-withsemantics-withboundary', 'val'))
+            self.files = [f for f in os.listdir(get_data_path('rplang-v3-withsemantics-withboundary', 'val')) if f.endswith('.npy')]
         elif self.mode == 'test':
-            self.files = os.listdir(get_data_path('rplang-v3-withsemantics-withboundary', 'test'))
+            self.files = [f for f in os.listdir(get_data_path('rplang-v3-withsemantics-withboundary', 'test')) if f.endswith('.npy')]
         else:
             assert 0, 'mode error'
-        self.files = sorted(self.files, key=lambda x: int(x[:-4]), reverse=False)
+        # Sort by filename (supports both numeric and descriptive names)
+        try:
+            # Try numeric sort first (for backward compatibility)
+            self.files = sorted(self.files, key=lambda x: int(x[:-4]), reverse=False)
+        except ValueError:
+            # Fall back to string sort for descriptive filenames
+            self.files = sorted(self.files, reverse=False)
         self.ftmps = []
         for fn in tqdm(self.files):
             self.ftmps.append(np.load(get_data_path('prerunning_cnn_featuremaps', fn), allow_pickle=True).item()[16][0])
@@ -63,9 +69,9 @@ class RPlanGEdgeSemanSimplified_81(Dataset):
         else:
             assert 0, 'mode error'
 
-        '''coords_withsemantics, (53, 16)'''
+        '''coords_withsemantics, (150, 16)'''
         corners_withsemantics = graph['corner_list_np_normalized_padding_withsemantics']
-        # 初始化一个n*9的新数组(53, 9)
+        # 初始化一个n*9的新数组(150, 9)
         corners_withsemantics_simplified = np.zeros((corners_withsemantics.shape[0], 9))
         # 复制第0、1列
         corners_withsemantics_simplified[:, 0:2] = corners_withsemantics[:, 0:2]
@@ -84,10 +90,11 @@ class RPlanGEdgeSemanSimplified_81(Dataset):
 
 
         
-        '''attn 1 matrix, (53, 53)'''
+        '''attn 1 matrix, (150, 150)'''
         # global_attn_matrix = structure_graph['global_matrix_np_padding'].astype(np.uint8)
-        global_attn_matrix = np.ones((53, 53), dtype=np.uint8)
-        '''corners padding mask, (53, 1)'''
+        max_corners = corners_withsemantics.shape[0]
+        global_attn_matrix = np.ones((max_corners, max_corners), dtype=np.uint8)
+        '''corners padding mask, (150, 1)'''
         corners_padding_mask = graph['padding_mask'] # uint8
 
         featmap_16 = self.ftmps[index]

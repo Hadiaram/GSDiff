@@ -129,8 +129,9 @@ while step < total_steps:
     padding2_sample = torch.multinomial(padding2_prob, num_samples=1)
     corners_padding2_mask = padding2_sample.reshape(batch_size, 53, 1).to(corners_padding_mask.dtype)
     noisy_corners_padding_mask = corners_padding2_mask - corners_padding_mask
-    corners = corners + truncated_normal(torch.empty((batch_size, 53, 2), dtype=corners.dtype, device=corners.device),
-                                     0, 1, -1, 1, dtype=corners.dtype, device=corners.device) * noisy_corners_padding_mask.expand(batch_size, 53, 2)
+    max_corners = corners.size(1)  # Dynamic corner count (150)
+    corners = corners + truncated_normal(torch.empty((batch_size, max_corners, 2), dtype=corners.dtype, device=corners.device),
+                                     0, 1, -1, 1, dtype=corners.dtype, device=corners.device) * noisy_corners_padding_mask.expand(batch_size, max_corners, 2)
     semantics = semantics + torch.randint(low=0, high=1+1, size=semantics.shape, dtype=semantics.dtype, device=semantics.device) * noisy_corners_padding_mask.expand(batch_size, 53, 7)
     # global_attn_matrix(bs, 53, 53)
     corners_padding_mask = corners_padding2_mask
@@ -140,19 +141,21 @@ while step < total_steps:
     sigma = 1 / 128
     lower = -3 * sigma
     upper = 3 * sigma
-    corners_noise = truncated_normal(torch.empty((batch_size, 53, 2), dtype=corners.dtype, device=corners.device),
+    max_corners = corners.size(1)  # Dynamic corner count (150)
+    corners_noise = truncated_normal(torch.empty((batch_size, max_corners, 2), dtype=corners.dtype, device=corners.device),
                                      mu, sigma, lower, upper, dtype=corners.dtype, device=corners.device)
     corners = corners + corners_noise
 
     # Introduce some perturbations to the 7-dimensional semantics and randomly reverse each semantics (1% probability for each)
-    semantics_one_hot = torch.stack((1 - semantics, semantics), dim=3).reshape(batch_size * 53 * 7, 2, 1)
+    max_corners = semantics.size(1)  # Dynamic corner count (150)
+    semantics_one_hot = torch.stack((1 - semantics, semantics), dim=3).reshape(batch_size * max_corners * 7, 2, 1)
     q_semantics_one_hot = torch.tensor([[0.99, 0.01],
                                         [0.01, 0.99]], dtype=semantics_one_hot.dtype, device=semantics_one_hot.device)[
-                          None, None, None, :, :].expand(batch_size, 53, 7, 2, 2).reshape(batch_size * 53 * 7, 2, 2)
-    semantics_prob = torch.bmm(q_semantics_one_hot, semantics_one_hot).reshape(batch_size * 53 * 7, 2)
+                          None, None, None, :, :].expand(batch_size, max_corners, 7, 2, 2).reshape(batch_size * max_corners * 7, 2, 2)
+    semantics_prob = torch.bmm(q_semantics_one_hot, semantics_one_hot).reshape(batch_size * max_corners * 7, 2)
     semantics_sample = torch.multinomial(semantics_prob, num_samples=1)
-    semantics = semantics_sample.reshape(batch_size, 53, 7).to(corners_withsemantics.dtype)
-    semantics = semantics * corners_padding_mask.expand(batch_size, 53, 7)
+    semantics = semantics_sample.reshape(batch_size, max_corners, 7).to(corners_withsemantics.dtype)
+    semantics = semantics * corners_padding_mask.expand(batch_size, max_corners, 7)
 
     edges = torch.cat((1 - edges, edges), dim=2).type(torch.uint8)
 

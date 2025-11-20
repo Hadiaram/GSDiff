@@ -259,14 +259,16 @@ for model_path_CDDPM in model_path_CDDPMs:
 
 
             # Visualization
-            os.mkdir(output_dir + 'test_corner_' + 'step' + str(k_test) + '_' + model_path_CDDPM.split('/')[2].replace('.pt', ''))
+            model_name = os.path.basename(model_path_CDDPM).replace('.pt', '')
+            corner_dir = os.path.join(output_dir, 'test_corner_step' + str(k_test) + '_' + model_name)
+            os.mkdir(corner_dir)
             for i in tqdm(range(len(result_corners_inverse_normalized_test))):
                 img = np.ones((resolution, resolution, 3), dtype=np.uint8)
                 img *= 255
                 # print(result_corners_inverse_normalized_test[i][0])
                 for p in result_corners_inverse_normalized_test[i][0]:
                     cv2.circle(img, tuple(p.tolist()), 3, (random.randint(0, 220), random.randint(0, 220), random.randint(0, 220)), -1)
-                cv2.imwrite(os.path.join(output_dir + 'test_corner_' + 'step' + str(k_test) + '_' + model_path_CDDPM.split('/')[2].replace('.pt', ''), f"{i}.png"), img)
+                cv2.imwrite(os.path.join(corner_dir, f"{i}.png"), img)
                 node_count += len(result_corners_inverse_normalized_test[i][0])
             node_count /= len(result_corners_inverse_normalized_test)
             print(node_count) #
@@ -348,7 +350,8 @@ for model_path_CDDPM in model_path_CDDPMs:
             edges_all_samples_test = edges_remove_padding(results_stage2_test['results_edges_' + str(k_test)],
                                                           results_stage2_test['results_corners_numbers_' + str(k_test)])
 
-            output_dir_test = output_dir + 'test_' + model_path_CDDPM.split('/')[2].replace('.pt', '') + '/'
+            model_name = os.path.basename(model_path_CDDPM).replace('.pt', '')
+            output_dir_test = os.path.join(output_dir, 'test_' + model_name)
             if os.path.exists(output_dir_test):
                 shutil.rmtree(output_dir_test)
             os.makedirs(output_dir_test)
