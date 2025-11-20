@@ -1,10 +1,14 @@
 import sys
+import os
 
 from matplotlib import colors
-sys.path.insert(0, r'C:\Users\hmbashir\AI Training\GSDiff')
-sys.path.insert(0, r'C:\Users\hmbashir\AI Training\GSDiff\datasets')
-sys.path.insert(0, r'C:\Users\hmbashir\AI Training\GSDiff\gsdiff')
-sys.path.insert(0, r'C:\Users\hmbashir\AI Training\GSDiff\scripts\metrics')
+
+# Add project paths to Python path (cross-platform)
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, project_root)
+sys.path.insert(0, os.path.join(project_root, 'datasets'))
+sys.path.insert(0, os.path.join(project_root, 'gsdiff'))
+sys.path.insert(0, os.path.join(project_root, 'scripts', 'metrics'))
 
 '''This is the script to train a node generation model with boundary constraint'''
 
@@ -34,9 +38,9 @@ diffusion_steps = 1000
 lr = 1e-4
 weight_decay = 1e-7
 total_steps = 150000  # Adjusted for smaller dataset (1051 samples vs 65k original)
-batch_size = 16  # Reduced from 256 for CPU testing
-batch_size_val = 50  # Reduced from 3000 for CPU testing
-device = 'cpu' # Changed from 'cuda:0' to CPU for debugging
+batch_size = 256  # Batch size for GPU training
+batch_size_val = 3000  # Full validation batch size for GPU
+device = 'cuda:0'  # GPU training on Linux/Ubuntu
 merge_points = True
 clamp_trick_training = True
 
@@ -206,12 +210,12 @@ if __name__ == '__main__':
 
     '''Data'''
     dataset_train = RPlanGEdgeSemanSimplified_81('train')
-    dataloader_train = DataLoader(dataset_train, batch_size=batch_size, shuffle=True, num_workers=0,
-                            drop_last=True, pin_memory=False)  # Set to 0 for Windows compatibility
+    dataloader_train = DataLoader(dataset_train, batch_size=batch_size, shuffle=True, num_workers=4,
+                            drop_last=True, pin_memory=True)  # Optimized for Linux/GPU
     dataloader_train_iter = iter(cycle(dataloader_train))
     dataset_val = RPlanGEdgeSemanSimplified_81('val')
-    dataloader_val = DataLoader(dataset_val, batch_size=batch_size_val, shuffle=False, num_workers=0,
-                            drop_last=False, pin_memory=False)  # Set to 0 for Windows compatibility
+    dataloader_val = DataLoader(dataset_val, batch_size=batch_size_val, shuffle=False, num_workers=4,
+                            drop_last=False, pin_memory=True)  # Optimized for Linux/GPU
     dataloader_val_iter = iter(cycle(dataloader_val))
 
     # TEMPORARILY DISABLED: Validation rendering hangs with fully connected edges

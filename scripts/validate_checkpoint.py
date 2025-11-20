@@ -1,8 +1,12 @@
 import sys
-sys.path.insert(0, r'C:\Users\hmbashir\AI Training\GSDiff')
-sys.path.insert(0, r'C:\Users\hmbashir\AI Training\GSDiff\datasets')
-sys.path.insert(0, r'C:\Users\hmbashir\AI Training\GSDiff\gsdiff')
-sys.path.insert(0, r'C:\Users\hmbashir\AI Training\GSDiff\scripts\metrics')
+import os
+
+# Add project paths to Python path (cross-platform)
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, project_root)
+sys.path.insert(0, os.path.join(project_root, 'datasets'))
+sys.path.insert(0, os.path.join(project_root, 'gsdiff'))
+sys.path.insert(0, os.path.join(project_root, 'scripts', 'metrics'))
 
 '''Standalone validation script to evaluate a checkpoint while training continues'''
 
@@ -21,9 +25,9 @@ from gsdiff.heterhouse_56_11 import EdgeModel
 
 # Configuration
 checkpoint_step = 5000  # Which checkpoint to validate
-device = 'cpu'
-batch_size_val = 50
-output_dir = r'C:\Users\hmbashir\AI Training\GSDiff\outputs\structure-81-106-3\\'
+device = 'cuda:0'
+batch_size_val = 3000
+output_dir = 'outputs/structure-81-106-3/'
 
 print(f"Loading checkpoint from step {checkpoint_step}...")
 

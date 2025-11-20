@@ -1,12 +1,15 @@
 import sys
+import os
 
 import cv2
 from PIL import Image, ImageDraw
 
-sys.path.insert(0, r'C:\Users\hmbashir\AI Training\GSDiff') # Modify it yourself
-sys.path.insert(0, r'C:\Users\hmbashir\AI Training\GSDiff\datasets') # Modify it yourself
-sys.path.insert(0, r'C:\Users\hmbashir\AI Training\GSDiff\gsdiff') # Modify it yourself
-sys.path.insert(0, r'C:\Users\hmbashir\AI Training\GSDiff\scripts\metrics') # Modify it yourself
+# Add project paths to Python path (cross-platform)
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, project_root)
+sys.path.insert(0, os.path.join(project_root, 'datasets'))
+sys.path.insert(0, os.path.join(project_root, 'gsdiff'))
+sys.path.insert(0, os.path.join(project_root, 'scripts', 'metrics'))
 
 
 import math
@@ -38,7 +41,7 @@ if __name__ == '__main__':
 
 
     '''create output_dir'''
-    output_dir = os.path.join('test_outputs', 'AP-1') + os.sep  # Keep trailing separator for consistency
+    output_dir = os.path.join('test_outputs', 'AP-1')
     if os.path.exists(output_dir):
         shutil.rmtree(output_dir)
     os.makedirs(output_dir, exist_ok=True)
@@ -73,18 +76,18 @@ if __name__ == '__main__':
 
     '''Data'''
     dataset_test = RPlanGEdgeSemanSimplified_81('test')
-    dataloader_test = DataLoader(dataset_test, batch_size=batch_size_test, shuffle=False, num_workers=0,
-                            drop_last=False, pin_memory=False)  # try different num_workers to be faster
+    dataloader_test = DataLoader(dataset_test, batch_size=batch_size_test, shuffle=False, num_workers=4,
+                            drop_last=False, pin_memory=True)  # Optimized for Linux
     dataloader_test_iter = iter(cycle(dataloader_test))
 
     dataset_test_for_gt_rendering = RPlanGEdgeSemanSimplified('test')
-    dataloader_test_for_gt_rendering = DataLoader(dataset_test_for_gt_rendering, batch_size=batch_size_test, shuffle=False, num_workers=0,
-                            drop_last=False, pin_memory=False)  # try different num_workers to be faster
+    dataloader_test_for_gt_rendering = DataLoader(dataset_test_for_gt_rendering, batch_size=batch_size_test, shuffle=False, num_workers=4,
+                            drop_last=False, pin_memory=True)  # Optimized for Linux
     dataloader_test_iter_for_gt_rendering = iter(cycle(dataloader_test_for_gt_rendering))
 
 
     '''In order to calculate such as FID and KID on the test set, the test set needs to be rendered first.'''
-    gt_dir_test = os.path.join(output_dir, 'test_gt') + os.sep  # Keep trailing separator for consistency
+    gt_dir_test = os.path.join(output_dir, 'test_gt')
     if os.path.exists(gt_dir_test):
         shutil.rmtree(gt_dir_test)
     os.makedirs(gt_dir_test)
@@ -158,7 +161,7 @@ if __name__ == '__main__':
 
 
     # Loading the trained edge model
-    model_path_EdgeModel = r"C:\Users\hmbashir\AI Training\GSDiff\scripts\outputs\structure-56-36-interval1000\model_stage2_best_065000.pt"
+    model_path_EdgeModel = "outputs/structure-56-36-interval1000/model_stage2_best_065000.pt"
     model_EdgeModel = BoundEdgeModel().to(device)
     model_EdgeModel.load_state_dict(torch.load(model_path_EdgeModel, map_location=device))
     for param in model_EdgeModel.parameters():
@@ -166,9 +169,9 @@ if __name__ == '__main__':
 
     # DDPM
     test_metrics = []
-    # NEW (manual path):
-    model_path_CDDPMs = [os.path.join(r'C:\Users\hmbashir\AI Training\GSDiff\scripts\outputs\structure-81-106-3', fn) 
-                        for fn in os.listdir(r'C:\Users\hmbashir\AI Training\GSDiff\scripts\outputs\structure-81-106-3') 
+    # Load model paths from outputs directory
+    model_path_CDDPMs = [os.path.join('outputs/structure-81-106-3', fn)
+                        for fn in os.listdir('outputs/structure-81-106-3')
                         if 'model' in fn and '.pt' in fn]
     for model_path_CDDPM in model_path_CDDPMs:
         # Extract model number from filename (e.g., 'model1000000.pt' -> '100')
@@ -377,9 +380,9 @@ if __name__ == '__main__':
                 edges_all_samples_test = edges_remove_padding(results_stage2_test['results_edges_' + str(k_test)],
                                                               results_stage2_test['results_corners_numbers_' + str(k_test)])
 
-                # Use basename to extract model name (works on both Windows and Unix)
+                # Use basename to extract model name
                 model_name = os.path.basename(model_path_CDDPM).replace('.pt', '')
-                output_dir_test = os.path.join(output_dir, 'test_' + model_name) + os.sep
+                output_dir_test = os.path.join(output_dir, 'test_' + model_name)
                 if os.path.exists(output_dir_test):
                     shutil.rmtree(output_dir_test)
                 os.makedirs(output_dir_test)

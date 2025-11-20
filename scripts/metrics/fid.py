@@ -43,7 +43,7 @@ def fid(path1, path2, fid_batch_size, fid_device):
                                              batch_size=fid_batch_size,
                                              shuffle=False,
                                              drop_last=False,
-                                             num_workers=0)  # Set to 0 for Windows compatibility
+                                             num_workers=4)  # Optimized for Linux
     pred_arr1 = np.empty((len(files1), dims)) # np.ndarray([len(test set), 2048])
     start_idx1 = 0
     for batch1 in tqdm(dataloader1):
@@ -70,7 +70,7 @@ def fid(path1, path2, fid_batch_size, fid_device):
                                              batch_size=fid_batch_size,
                                              shuffle=False,
                                              drop_last=False,
-                                             num_workers=0)  # Set to 0 for Windows compatibility
+                                             num_workers=4)  # Optimized for Linux
     pred_arr2 = np.empty((len(files2), dims))
     start_idx2 = 0
     for batch2 in tqdm(dataloader2):
