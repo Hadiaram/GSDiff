@@ -88,7 +88,7 @@ class MultiHeadAttention(nn.Module):
         mask = mask[:, None, :, :]
         # calculate attention
         scores = torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(self.d_subspace)
-        scores = scores.masked_fill(mask == False, -1e9)
+        scores = scores.masked_fill(mask == False, -65504)  # Use -65504 instead of -1e9 for FP16 compatibility
         scores = F.softmax(scores, dim=-1)
         scores = torch.matmul(scores, v)
         # concatenate heads and put through final linear layer
@@ -119,7 +119,7 @@ class MultiHeadCrossAttention(nn.Module):
         mask = mask[:, None, :, :]
         # calculate attention
         scores = torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(self.d_subspace)
-        scores = scores.masked_fill(mask == False, -1e9)
+        scores = scores.masked_fill(mask == False, -65504)  # Use -65504 instead of -1e9 for FP16 compatibility
         scores = F.softmax(scores, dim=-1)
         scores = torch.matmul(scores, v)
         # concatenate heads and put through final linear layer

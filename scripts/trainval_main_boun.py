@@ -44,11 +44,6 @@ device = 'cuda:0'  # GPU training on Linux/Ubuntu
 merge_points = True
 clamp_trick_training = True
 
-# Performance optimizations
-num_workers = 8  # Multi-threaded data loading (adjust based on CPU cores)
-use_amp = True  # Mixed precision training for ~2x speedup
-gradient_accumulation_steps = 1  # Accumulate gradients over N steps
-
 
 def map_to_binary(tensor):
     batch_size, n_values = tensor.shape
@@ -215,14 +210,12 @@ if __name__ == '__main__':
 
     '''Data'''
     dataset_train = RPlanGEdgeSemanSimplified_81('train')
-    dataloader_train = DataLoader(dataset_train, batch_size=batch_size, shuffle=True, num_workers=num_workers,
-                            drop_last=True, pin_memory=True, persistent_workers=True if num_workers > 0 else False,
-                            prefetch_factor=2 if num_workers > 0 else None)  # Optimized for GPU with async data loading
+    dataloader_train = DataLoader(dataset_train, batch_size=batch_size, shuffle=True, num_workers=8,
+                            drop_last=True, pin_memory=True)  # Optimized for Linux/GPU
     dataloader_train_iter = iter(cycle(dataloader_train))
     dataset_val = RPlanGEdgeSemanSimplified_81('val')
-    dataloader_val = DataLoader(dataset_val, batch_size=batch_size_val, shuffle=False, num_workers=num_workers,
-                            drop_last=False, pin_memory=True, persistent_workers=True if num_workers > 0 else False,
-                            prefetch_factor=2 if num_workers > 0 else None)  # Optimized for GPU with async data loading
+    dataloader_val = DataLoader(dataset_val, batch_size=batch_size_val, shuffle=False, num_workers=8,
+                            drop_last=False, pin_memory=True)  # Optimized for Linux/GPU
     dataloader_val_iter = iter(cycle(dataloader_val))
 
     # TEMPORARILY DISABLED: Validation rendering hangs with fully connected edges
@@ -326,11 +319,6 @@ if __name__ == '__main__':
     '''Optim'''
     optimizer = AdamW(list(model.parameters()), lr=lr, weight_decay=weight_decay)
     
-    '''Mixed Precision Training'''
-    scaler = torch.cuda.amp.GradScaler() if use_amp else None
-    if use_amp:
-        print('Mixed precision training enabled (FP16) for ~2x speedup')
-    
     '''Resume from checkpoint'''
     resume_step = 5000  # Set to 0 to start from scratch, or checkpoint step number to resume
     if resume_step > 0:
@@ -359,24 +347,26 @@ if __name__ == '__main__':
         feat_16, corners_withsemantics_0, global_attn_matrix, corners_padding_mask = next(dataloader_train_iter)
 
         
-        # feat_64 = feat_64.to(device, non_blocking=True).float() # (bs, c=256, h=64, w=64)
-        # feat_32 = feat_32.to(device, non_blocking=True).float() # (bs, c=512, h=32, w=32)
-        feat_16 = feat_16.to(device, non_blocking=True).float() # (bs, c=1024, h=16, w=16)
+        # feat_64 = feat_64.to(device).float() # (bs, c=256, h=64, w=64)
+        # feat_32 = feat_32.to(device).float() # (bs, c=512, h=32, w=32)
+        feat_16 = feat_16.to(device).float() # (bs, c=1024, h=16, w=16)
 
 
 
         
-        corners_withsemantics_0 = corners_withsemantics_0.to(device, non_blocking=True).clamp(-1, 1)
+        corners_withsemantics_0 = corners_withsemantics_0.to(device).clamp(-1, 1)
 
-        global_attn_matrix = global_attn_matrix.to(device, non_blocking=True)
-        corners_padding_mask = corners_padding_mask.to(device, non_blocking=True)
+        global_attn_matrix = global_attn_matrix.to(device)
+        corners_padding_mask = corners_padding_mask.to(device)
 
         # (bs, 53, 10)
         corners_withsemantics_0 = torch.cat((corners_withsemantics_0, (1 - corners_padding_mask).type(corners_withsemantics_0.dtype)), dim=2)
 
         '''clear all params grad, to prepare for new computation'''
-        if step % gradient_accumulation_steps == 1:
-            optimizer.zero_grad(set_to_none=True)  # More efficient than zeroing
+        for param in model.parameters():
+            if param.grad is not None:
+                param.grad.detach_()
+                param.grad.zero_()
 
 
 
@@ -397,18 +387,18 @@ if __name__ == '__main__':
 
 
         '''model: predicts corners_noise (or corners_0) and edges_0'''
+
+
         
-        # Use mixed precision for forward pass
-        with torch.cuda.amp.autocast() if use_amp else torch.cuda.amp.autocast(enabled=False):
-            # output_corners_withsemantics1, output_corners_withsemantics2 = model(corners_withsemantics_t, global_attn_matrix, t, 
-            #                                                                      feat_64, feat_32, feat_16)
-            # output_corners_withsemantics1, output_corners_withsemantics2 = model(corners_withsemantics_t, global_attn_matrix, t, 
-            #                                                                      feat_32, feat_16)
-            output_corners_withsemantics1, output_corners_withsemantics2 = model(corners_withsemantics_t, global_attn_matrix, t, 
-                                                                                feat_16)
+        # output_corners_withsemantics1, output_corners_withsemantics2 = model(corners_withsemantics_t, global_attn_matrix, t, 
+        #                                                                      feat_64, feat_32, feat_16)
+        # output_corners_withsemantics1, output_corners_withsemantics2 = model(corners_withsemantics_t, global_attn_matrix, t, 
+        #                                                                      feat_32, feat_16)
+        output_corners_withsemantics1, output_corners_withsemantics2 = model(corners_withsemantics_t, global_attn_matrix, t, 
+                                                                            feat_16)
 
 
-            output_corners_withsemantics = torch.cat((output_corners_withsemantics1, output_corners_withsemantics2), dim=2)
+        output_corners_withsemantics = torch.cat((output_corners_withsemantics1, output_corners_withsemantics2), dim=2)
 
         '''target'''
         corners_withsemantics_target1 = corners_withsemantics_noise
@@ -522,27 +512,13 @@ if __name__ == '__main__':
         # corners_loss_batch2 *= 1
         local_aligned_loss *= 1
         loss_batch = corners_loss_batch1 + corners_loss_batch2 + local_aligned_loss
-        
-        # Scale loss for gradient accumulation
-        loss_batch = loss_batch / gradient_accumulation_steps
 
         '''loss backward'''
-        if use_amp and scaler is not None:
-            scaler.scale(loss_batch).backward()
-            if step % gradient_accumulation_steps == 0:
-                '''clip norm, if False, training long steps may diverge'''
-                scaler.unscale_(optimizer)
-                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.1)
-                '''update params'''
-                scaler.step(optimizer)
-                scaler.update()
-        else:
-            loss_batch.backward()
-            if step % gradient_accumulation_steps == 0:
-                '''clip norm, if False, training long steps may diverge'''
-                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.1)
-                '''update params'''
-                optimizer.step()
+        loss_batch.backward()
+        '''clip norm, if False, training long steps may diverge'''
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.1)
+        '''update params'''
+        optimizer.step()
         '''step += 1'''
         step += 1
 
@@ -606,13 +582,13 @@ if __name__ == '__main__':
                 # feat_32_val_batch, feat_16_val_batch, corners_withsemantics_0_val_batch, global_attn_matrix_val_batch, corners_padding_mask_val_batch = next(dataloader_val_iter)
                 feat_16_val_batch, corners_withsemantics_0_val_batch, global_attn_matrix_val_batch, corners_padding_mask_val_batch = next(dataloader_val_iter)
 
-                # feat_64_val_batch = feat_64_val_batch.to(device, non_blocking=True).float() # (bs, c=256, h=64, w=64)
-                # feat_32_val_batch = feat_32_val_batch.to(device, non_blocking=True).float() # (bs, c=512, h=32, w=32)
-                feat_16_val_batch = feat_16_val_batch.to(device, non_blocking=True).float() # (bs, c=1024, h=16, w=16)
+                # feat_64_val_batch = feat_64_val_batch.to(device).float() # (bs, c=256, h=64, w=64)
+                # feat_32_val_batch = feat_32_val_batch.to(device).float() # (bs, c=512, h=32, w=32)
+                feat_16_val_batch = feat_16_val_batch.to(device).float() # (bs, c=1024, h=16, w=16)
                 
-                corners_withsemantics_0_val_batch = corners_withsemantics_0_val_batch.to(device, non_blocking=True).clamp(-1, 1)
-                global_attn_matrix_val_batch = global_attn_matrix_val_batch.to(device, non_blocking=True)
-                corners_padding_mask_val_batch = corners_padding_mask_val_batch.to(device, non_blocking=True)
+                corners_withsemantics_0_val_batch = corners_withsemantics_0_val_batch.to(device).clamp(-1, 1)
+                global_attn_matrix_val_batch = global_attn_matrix_val_batch.to(device)
+                corners_padding_mask_val_batch = corners_padding_mask_val_batch.to(device)
 
                 # (bs, 53, 10)
                 corners_withsemantics_0_val_batch = torch.cat((corners_withsemantics_0_val_batch, (1 - corners_padding_mask_val_batch).type(corners_withsemantics_0_val_batch.dtype)), dim=2)
