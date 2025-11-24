@@ -156,8 +156,7 @@ class BoundEdgeModel_150Corners(nn.Module):
         """
         batch_size = corners.shape[0]
 
-        '''Create edge embeddings from corner pairs'''
-        # Edge coordinates - combine all pairs of corners
+        '''Create edge coordinates and semantics from corner pairs'''
         edge_coords_padding_mask = global_attn_matrix.reshape(corners.shape[0], -1, 1)
         edge_coords1 = ((corners[:, :, None, :].repeat(1, 1, corners.shape[1], 1)
                          .reshape(corners.shape[0], -1, corners.shape[2]) * 128 + 128) *
@@ -166,7 +165,6 @@ class BoundEdgeModel_150Corners(nn.Module):
                          .reshape(corners.shape[0], -1, corners.shape[2]) * 128 + 128) *
                         edge_coords_padding_mask).float()
 
-        # Edge semantics - combine all pairs of semantics
         edge_semans1 = ((semantics[:, :, None, :].repeat(1, 1, semantics.shape[1], 1)
                          .reshape(semantics.shape[0], -1, semantics.shape[2])) *
                         edge_coords_padding_mask).float()
@@ -174,11 +172,36 @@ class BoundEdgeModel_150Corners(nn.Module):
                          .reshape(semantics.shape[0], -1, semantics.shape[2])) *
                         edge_coords_padding_mask).float()
 
-        edge_semans = (edge_semans1 + edge_semans2) / 2
+        '''Sinusoidal positional encoding for edge coordinates'''
+        # Frequency terms for sinusoidal encoding
+        div_term = (1 / 10000) ** (torch.arange(0, self.d_model // 4, 2, device=edge_coords1.device).float() / (self.d_model // 4))
 
-        # Embed edge features
-        edge_coords = torch.cat([edge_coords1, edge_coords2], dim=2)
-        edges_embedding = torch.cat([edge_coords, self.semantics_embedding(edge_semans)], dim=2)
+        # Encode edge_coords1 (first corner)
+        edge_coords1_embedding_sin_x = (edge_coords1[:, :, 0:1] * div_term[None, None, :]).sin()
+        edge_coords1_embedding_cos_x = (edge_coords1[:, :, 0:1] * div_term[None, None, :]).cos()
+        edge_coords1_embedding_x = torch.stack((edge_coords1_embedding_sin_x, edge_coords1_embedding_cos_x), dim=3).flatten(2, 3)
+
+        edge_coords1_embedding_sin_y = (edge_coords1[:, :, 1:2] * div_term[None, None, :]).sin()
+        edge_coords1_embedding_cos_y = (edge_coords1[:, :, 1:2] * div_term[None, None, :]).cos()
+        edge_coords1_embedding_y = torch.stack((edge_coords1_embedding_sin_y, edge_coords1_embedding_cos_y), dim=3).flatten(2, 3)
+
+        edge_coords1_embedding = torch.cat((edge_coords1_embedding_x, edge_coords1_embedding_y), dim=2)
+        edge_coords1_embedding = torch.cat((edge_coords1_embedding, self.semantics_embedding(edge_semans1)), dim=2)
+
+        # Encode edge_coords2 (second corner)
+        edge_coords2_embedding_sin_x = (edge_coords2[:, :, 0:1] * div_term[None, None, :]).sin()
+        edge_coords2_embedding_cos_x = (edge_coords2[:, :, 0:1] * div_term[None, None, :]).cos()
+        edge_coords2_embedding_x = torch.stack((edge_coords2_embedding_sin_x, edge_coords2_embedding_cos_x), dim=3).flatten(2, 3)
+
+        edge_coords2_embedding_sin_y = (edge_coords2[:, :, 1:2] * div_term[None, None, :]).sin()
+        edge_coords2_embedding_cos_y = (edge_coords2[:, :, 1:2] * div_term[None, None, :]).cos()
+        edge_coords2_embedding_y = torch.stack((edge_coords2_embedding_sin_y, edge_coords2_embedding_cos_y), dim=3).flatten(2, 3)
+
+        edge_coords2_embedding = torch.cat((edge_coords2_embedding_x, edge_coords2_embedding_y), dim=2)
+        edge_coords2_embedding = torch.cat((edge_coords2_embedding, self.semantics_embedding(edge_semans2)), dim=2)
+
+        # Combine embeddings from both corners
+        edges_embedding = (edge_coords1_embedding + edge_coords2_embedding) / 2
 
         '''Process CNN features'''
         x16 = self.proj16(feat_16) + self.sinopos(feat_16)
