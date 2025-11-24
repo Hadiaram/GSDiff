@@ -154,7 +154,7 @@ while step < total_steps:
     
     # MEMORY OPTIMIZATION: Subsample corners before moving to GPU
     # This reduces attention from O(150²) to O(80²), saving ~12x memory
-    B, N, F = corners_withsemantics.shape
+    B, N, F_dim = corners_withsemantics.shape
     
     if N > max_corners_for_training:
         # Randomly select a subset of corners for this training step
@@ -239,7 +239,7 @@ while step < total_steps:
                     feat_16_val, corners_val, global_attn_val, padding_mask_val, edges_val = next(dataloader_val_iter)
                     
                     # MEMORY OPTIMIZATION: Subsample corners for validation (same as training)
-                    B_val, N_val, F_val = corners_val.shape
+                    B_val, N_val, F_dim_val = corners_val.shape
                     
                     if N_val > max_corners_for_training:
                         # Use same subsampling strategy as training
