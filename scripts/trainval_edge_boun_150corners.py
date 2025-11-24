@@ -24,10 +24,11 @@ This script trains an edge prediction model that takes corners from Stage 1 and 
 lr = 1e-4
 weight_decay = 1e-5
 total_steps = float("inf")  # Will use early stopping
-batch_size = 2  # Reduced for 150x150=22500 edges (90K edges per batch is huge!)
-accumulation_steps = 2  # Gradient accumulation to maintain effective batch size of 4
+batch_size = 1  # Must be 1 for 150x150=22500 edges (attention matrix is huge!)
+accumulation_steps = 4  # Gradient accumulation to maintain effective batch size of 4
 device = 'cuda:0'
 use_mixed_precision = True  # Use automatic mixed precision (fp16) for memory efficiency
+use_gradient_checkpointing = True  # Trade compute for memory
 
 '''Create output directory'''
 output_dir = 'outputs/structure-56-150corners-edge/'
@@ -43,17 +44,20 @@ Physical Batch Size: {batch_size}
 Gradient Accumulation Steps: {accumulation_steps}
 Effective Batch Size: {batch_size * accumulation_steps}
 Mixed Precision: {use_mixed_precision}
+Gradient Checkpointing: {use_gradient_checkpointing}
 Device: {device}
 Max Corners: 150
 Edge Dimensions: 150x150 = 22,500 edges
+Attention Matrix: 22,500 x 22,500 per layer (12 layers)
 Model: BoundEdgeModel_150Corners
 Dataset: RPlanGEdgeSemanSimplified_81_WithEdges
 Output Directory: {output_dir}
 
 Memory Optimization Strategy:
-- Reduced physical batch to 2 (50% memory reduction)
-- Gradient accumulation maintains effective batch size of 4
-- Mixed precision (fp16) for additional memory savings
+- Batch size MUST be 1 (attention matrix is 22500x22500 = 506M elements)
+- Gradient accumulation over 4 steps maintains effective batch size of 4
+- Mixed precision (fp16) reduces memory by ~50%
+- Gradient checkpointing trades compute for memory (~2x slower, ~50% less memory)
 """
 with open(os.path.join(output_dir, 'training_config.txt'), 'w') as f:
     f.write(config_text)
@@ -63,6 +67,18 @@ print(config_text)
 '''Neural Network'''
 model = BoundEdgeModel_150Corners().to(device)
 print(f'Total params: {sum(p.numel() for p in model.parameters()):,}')
+
+# Enable gradient checkpointing to save memory
+if use_gradient_checkpointing:
+    print("Enabling gradient checkpointing...")
+    from torch.utils.checkpoint import checkpoint
+    # Wrap transformer layers with checkpointing
+    original_forward = model.transformer_layers.forward
+    def checkpointed_forward(x, *args):
+        for layer in model.transformer_layers:
+            x = checkpoint(layer, x, *args, use_reentrant=False)
+        return x
+    model.transformer_layers.forward = checkpointed_forward
 
 '''Data'''
 print("\nLoading training dataset...")
