@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.join(project_root, 'gsdiff'))
 
 import math
 import torch
+import torch.nn.functional as F
 from torch.optim import AdamW, SGD
 from torch.utils.data import DataLoader
 from datasets.rplang_edge_semantics_simplified_81_withedges import RPlanGEdgeSemanSimplified_81_WithEdges
@@ -30,6 +31,11 @@ device = 'cuda:0'
 use_mixed_precision = True  # Use automatic mixed precision (fp16) for memory efficiency
 use_gradient_checkpointing = True  # Trade compute for memory
 
+# MEMORY OPTIMIZATION: Subsample corners to reduce O(N²) attention cost
+# 150 corners → 22,500 edges → attention matrix is ~4GB per layer
+# 80 corners → 6,400 edges → attention matrix is ~330MB per layer (~12x reduction!)
+max_corners_for_training = 80  # Reduce from 150 to 80 to fit in memory
+
 '''Create output directory'''
 output_dir = 'outputs/structure-56-150corners-edge/'
 os.makedirs(output_dir, exist_ok=True)
@@ -46,18 +52,25 @@ Effective Batch Size: {batch_size * accumulation_steps}
 Mixed Precision: {use_mixed_precision}
 Gradient Checkpointing: {use_gradient_checkpointing}
 Device: {device}
-Max Corners: 150
-Edge Dimensions: 150x150 = 22,500 edges
+Max Corners: 150 (subsampled to {max_corners_for_training} for training)
+Edge Dimensions: {max_corners_for_training}x{max_corners_for_training} = {max_corners_for_training**2} edges (reduced from 22,500)
 Attention Matrix: 22,500 x 22,500 per layer (12 layers)
 Model: BoundEdgeModel_150Corners
 Dataset: RPlanGEdgeSemanSimplified_81_WithEdges
 Output Directory: {output_dir}
 
 Memory Optimization Strategy:
-- Batch size MUST be 1 (attention matrix is 22500x22500 = 506M elements)
+- Corner subsampling: Train on {max_corners_for_training} corners (not 150) per sample
+  * Reduces attention from 150²=22,500 to {max_corners_for_training}²={max_corners_for_training**2} (~12x reduction)
+  * Attention matrix per layer: ~4GB → ~330MB (~12x memory savings!)
+  * Model learns on random subgraphs, which helps generalization
+- Batch size MUST be 1 (even with subsampling, attention is still large)
 - Gradient accumulation over 4 steps maintains effective batch size of 4
 - Mixed precision (fp16) reduces memory by ~50%
 - Gradient checkpointing trades compute for memory (~2x slower, ~50% less memory)
+
+Note: Reducing corners is the PRIMARY memory optimization (12x reduction).
+      The other techniques provide additional 2-4x savings on top of that.
 """
 with open(os.path.join(output_dir, 'training_config.txt'), 'w') as f:
     f.write(config_text)
@@ -125,7 +138,12 @@ def truncated_normal(tensor, mu, sigma, lower, upper, dtype, device):
     return tensor
 
 print("\n" + "="*60)
-print("Starting Stage 2 Edge Training (150 Corners)")
+print("Starting Stage 2 Edge Training")
+print("="*60)
+print(f"MEMORY OPTIMIZATION: Training on {max_corners_for_training} corners (subsampled from 150)")
+print(f"  - Attention matrix: {max_corners_for_training}x{max_corners_for_training} = {max_corners_for_training**2} edges")
+print(f"  - Memory reduction: ~12x compared to full 150 corners")
+print(f"  - Each training step uses a random subset of {max_corners_for_training} corners")
 print("="*60 + "\n")
 
 accumulation_counter = 0
@@ -133,6 +151,33 @@ accumulation_counter = 0
 while step < total_steps:
     '''Training step with gradient accumulation'''
     feat_16, corners_withsemantics, global_attn_matrix, corners_padding_mask, edges = next(dataloader_train_iter)
+    
+    # MEMORY OPTIMIZATION: Subsample corners before moving to GPU
+    # This reduces attention from O(150²) to O(80²), saving ~12x memory
+    B, N, F = corners_withsemantics.shape
+    
+    if N > max_corners_for_training:
+        # Randomly select a subset of corners for this training step
+        idx = torch.randperm(N)[:max_corners_for_training]
+        
+        # Subsample corners and padding mask
+        corners_withsemantics = corners_withsemantics[:, idx, :]  # (B, K, F)
+        corners_padding_mask = corners_padding_mask[:, idx]       # (B, K)
+        
+        # Subsample global attention matrix
+        if global_attn_matrix.dim() == 3:
+            # (B, N, N) -> (B, K, K)
+            global_attn_matrix = global_attn_matrix[:, idx][:, :, idx]
+        elif global_attn_matrix.dim() == 2:
+            # (N, N) -> (K, K), then broadcast to batch
+            global_attn_matrix = global_attn_matrix[idx][:, idx].unsqueeze(0).expand(B, -1, -1)
+        else:
+            raise ValueError(f"Unexpected global_attn_matrix shape: {global_attn_matrix.shape}")
+        
+        # Reshape edges to (B, N, N, 1), subsample, then flatten back
+        edges_mat = edges.view(B, N, N, 1)                              # (B, N, N, 1)
+        edges_sub = edges_mat[:, idx][:, :, idx, :]                     # (B, K, K, 1)
+        edges = edges_sub.view(B, max_corners_for_training * max_corners_for_training, 1)  # (B, K*K, 1)
 
     feat_16 = feat_16.to(device).float()  # (bs, c=1024, h=16, w=16)
     corners_withsemantics = corners_withsemantics.to(device).clamp(-1, 1)
@@ -192,6 +237,25 @@ while step < total_steps:
             with torch.cuda.amp.autocast(enabled=use_mixed_precision):
                 for val_idx in range(min(100, len(dataset_val))):  # Validate on 100 samples
                     feat_16_val, corners_val, global_attn_val, padding_mask_val, edges_val = next(dataloader_val_iter)
+                    
+                    # MEMORY OPTIMIZATION: Subsample corners for validation (same as training)
+                    B_val, N_val, F_val = corners_val.shape
+                    
+                    if N_val > max_corners_for_training:
+                        # Use same subsampling strategy as training
+                        idx_val = torch.randperm(N_val)[:max_corners_for_training]
+                        
+                        corners_val = corners_val[:, idx_val, :]
+                        padding_mask_val = padding_mask_val[:, idx_val]
+                        
+                        if global_attn_val.dim() == 3:
+                            global_attn_val = global_attn_val[:, idx_val][:, :, idx_val]
+                        elif global_attn_val.dim() == 2:
+                            global_attn_val = global_attn_val[idx_val][:, idx_val].unsqueeze(0).expand(B_val, -1, -1)
+                        
+                        edges_mat_val = edges_val.view(B_val, N_val, N_val, 1)
+                        edges_sub_val = edges_mat_val[:, idx_val][:, :, idx_val, :]
+                        edges_val = edges_sub_val.view(B_val, max_corners_for_training * max_corners_for_training, 1)
 
                     feat_16_val = feat_16_val.to(device).float()
                     corners_val = corners_val.to(device).clamp(-1, 1)
