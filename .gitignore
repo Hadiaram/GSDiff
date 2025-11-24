@@ -6,7 +6,7 @@
 /venv/
 **/outputs/
 **/test_outputs/
-Dockerfile
+Dockerfilex
 
 # ----- Virtual envs -----
 .venv/

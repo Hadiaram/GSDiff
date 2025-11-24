@@ -9,13 +9,13 @@ sys.path.insert(0, os.path.join(project_root, 'gsdiff'))
 
 import math
 import torch
-import torch.nn.functional as F
 from torch.optim import AdamW, SGD
 from torch.utils.data import DataLoader
 from datasets.rplang_edge_semantics_simplified_81_withedges import RPlanGEdgeSemanSimplified_81_WithEdges
 from gsdiff.heterhouse_56_32_150corners import BoundEdgeModel_150Corners
 from gsdiff.utils import *
 from itertools import cycle
+import torch.nn.functional as F  # Import after wildcard to avoid being overwritten
 
 '''
 Stage 2 Edge Prediction Training for Boundary-Constrained Generation with 150 Corners
