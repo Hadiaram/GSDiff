@@ -86,8 +86,12 @@ with torch.no_grad():
         global_attn = global_attn.to(device)
         padding_mask = padding_mask.to(device)
 
-        # Start from random noise
-        corners_t = torch.randn_like(corners_gt).to(device)
+        # IMPORTANT: Add padding mask as 10th dimension (model was trained this way!)
+        # (bs, 150, 9) + (bs, 150, 1) -> (bs, 150, 10)
+        corners_gt_with_mask = torch.cat((corners_gt, (1 - padding_mask).type(corners_gt.dtype)), dim=2)
+
+        # Start from random noise (10 dimensions now)
+        corners_t = torch.randn_like(corners_gt_with_mask).to(device)
 
         # Reverse diffusion process
         for time_step in reversed(range(diffusion_steps)):
@@ -97,11 +101,15 @@ with torch.no_grad():
             output1, output2 = model(corners_t, global_attn, t, feat_16)
             predicted_noise = torch.cat((output1, output2), dim=2)
 
-            # Denoising step (simplified DDPM)
+            # Denoising step (DDPM with clamp trick - matching training!)
             if time_step > 0:
                 # Predict x0
                 pred_x0 = (corners_t - sqrt_one_minus_alphas_cumprod[time_step] * predicted_noise) / sqrt_alphas_cumprod[time_step]
-                pred_x0 = torch.clamp(pred_x0, -1, 1)
+
+                # Apply clamp trick (matching training behavior)
+                pred_x0_coord = torch.clamp(pred_x0[:, :, 0:2], min=-1, max=1)  # Clamp coordinates
+                pred_x0_seman = (pred_x0[:, :, 2:] >= 0.5).float()  # Binarize semantics
+                pred_x0 = torch.cat((pred_x0_coord, pred_x0_seman), dim=2)
 
                 # Get posterior mean
                 mean = (posterior_mean_coef1[time_step] * pred_x0 +
@@ -113,11 +121,15 @@ with torch.no_grad():
             else:
                 # Final step - no noise
                 pred_x0 = (corners_t - sqrt_one_minus_alphas_cumprod[time_step] * predicted_noise) / sqrt_alphas_cumprod[time_step]
-                corners_t = torch.clamp(pred_x0, -1, 1)
 
-        # Extract results
-        corners_pred = corners_t[0].cpu().numpy()  # (150, 9)
-        corners_gt_np = corners_gt[0].cpu().numpy()
+                # Apply clamp trick on final output
+                pred_x0_coord = torch.clamp(pred_x0[:, :, 0:2], min=-1, max=1)
+                pred_x0_seman = (pred_x0[:, :, 2:] >= 0.5).float()
+                corners_t = torch.cat((pred_x0_coord, pred_x0_seman), dim=2)
+
+        # Extract results (remove the padding mask dimension we added)
+        corners_pred = corners_t[0, :, :9].cpu().numpy()  # (150, 9) - remove 10th dim
+        corners_gt_np = corners_gt[0].cpu().numpy()  # (150, 9)
         padding_mask_np = padding_mask[0].cpu().numpy().flatten()
 
         # Get valid corners (non-padded)
