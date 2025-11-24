@@ -24,8 +24,10 @@ This script trains an edge prediction model that takes corners from Stage 1 and 
 lr = 1e-4
 weight_decay = 1e-5
 total_steps = float("inf")  # Will use early stopping
-batch_size = 4  # Smaller batch size for 150x150=22500 edges vs 53x53=2809
+batch_size = 2  # Reduced for 150x150=22500 edges (90K edges per batch is huge!)
+accumulation_steps = 2  # Gradient accumulation to maintain effective batch size of 4
 device = 'cuda:0'
+use_mixed_precision = True  # Use automatic mixed precision (fp16) for memory efficiency
 
 '''Create output directory'''
 output_dir = 'outputs/structure-56-150corners-edge/'
@@ -37,13 +39,21 @@ Stage 2 Edge Training Configuration (150 Corners)
 ================================================
 Learning Rate: {lr}
 Weight Decay: {weight_decay}
-Batch Size: {batch_size}
+Physical Batch Size: {batch_size}
+Gradient Accumulation Steps: {accumulation_steps}
+Effective Batch Size: {batch_size * accumulation_steps}
+Mixed Precision: {use_mixed_precision}
 Device: {device}
 Max Corners: 150
 Edge Dimensions: 150x150 = 22,500 edges
-Model: BoundEdgeModel
+Model: BoundEdgeModel_150Corners
 Dataset: RPlanGEdgeSemanSimplified_81_WithEdges
 Output Directory: {output_dir}
+
+Memory Optimization Strategy:
+- Reduced physical batch to 2 (50% memory reduction)
+- Gradient accumulation maintains effective batch size of 4
+- Mixed precision (fp16) for additional memory savings
 """
 with open(os.path.join(output_dir, 'training_config.txt'), 'w') as f:
     f.write(config_text)
@@ -69,6 +79,9 @@ dataloader_val_iter = iter(cycle(dataloader_val))
 
 '''Optimizer'''
 optimizer = AdamW(list(model.parameters()), lr=lr, weight_decay=weight_decay)
+
+'''Mixed Precision Scaler'''
+scaler = torch.cuda.amp.GradScaler(enabled=use_mixed_precision)
 
 '''Training State'''
 step = 0
@@ -99,8 +112,10 @@ print("\n" + "="*60)
 print("Starting Stage 2 Edge Training (150 Corners)")
 print("="*60 + "\n")
 
+accumulation_counter = 0
+
 while step < total_steps:
-    '''Training step'''
+    '''Training step with gradient accumulation'''
     feat_16, corners_withsemantics, global_attn_matrix, corners_padding_mask, edges = next(dataloader_train_iter)
 
     feat_16 = feat_16.to(device).float()  # (bs, c=1024, h=16, w=16)
@@ -120,59 +135,70 @@ while step < total_steps:
     semantics_mask = torch.rand_like(semantics) > 0.02  # 2% dropout
     semantics_perturbed = semantics * semantics_mask.float()
 
-    '''Forward pass'''
+    '''Forward pass with mixed precision'''
     model.train()
-    edges_pred_logits, _ = model(corners_perturbed, global_attn_matrix, corners_padding_mask,
-                                   semantics_perturbed, feat_16)
+    with torch.cuda.amp.autocast(enabled=use_mixed_precision):
+        edges_pred_logits, _ = model(corners_perturbed, global_attn_matrix, corners_padding_mask,
+                                       semantics_perturbed, feat_16)
 
-    # Binary cross-entropy loss for edge prediction
-    # edges_pred_logits: (bs, 22500, 2) -> softmax -> (bs, 22500, 2)
-    # edges: (bs, 22500, 1) -> ground truth
-    edges_gt = edges.squeeze(-1).long()  # (bs, 22500)
-    edge_mask = global_attn_matrix.reshape(corners.shape[0], -1)  # (bs, 22500)
+        # Binary cross-entropy loss for edge prediction
+        # edges_pred_logits: (bs, 22500, 2) -> softmax -> (bs, 22500, 2)
+        # edges: (bs, 22500, 1) -> ground truth
+        edges_gt = edges.squeeze(-1).long()  # (bs, 22500)
+        edge_mask = global_attn_matrix.reshape(corners.shape[0], -1)  # (bs, 22500)
 
-    loss = F.cross_entropy(edges_pred_logits[edge_mask], edges_gt[edge_mask])
+        loss = F.cross_entropy(edges_pred_logits[edge_mask], edges_gt[edge_mask])
+        loss = loss / accumulation_steps  # Scale loss by accumulation steps
 
     '''Backward pass'''
-    optimizer.zero_grad()
-    loss.backward()
-    torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)  # Gradient clipping
-    optimizer.step()
+    scaler.scale(loss).backward()
 
-    loss_curve.append(loss.item())
+    accumulation_counter += 1
+
+    # Only update weights after accumulating gradients
+    if accumulation_counter >= accumulation_steps:
+        scaler.unscale_(optimizer)
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)  # Gradient clipping
+        scaler.step(optimizer)
+        scaler.update()
+        optimizer.zero_grad()
+        accumulation_counter = 0
+
+    loss_curve.append(loss.item() * accumulation_steps)  # Store unscaled loss
 
     '''Validation'''
-    if step % interval == 0:
+    if step % interval == 0 and accumulation_counter == 0:  # Only validate after weight update
         model.eval()
         val_losses = []
         val_accs = []
 
         with torch.no_grad():
-            for val_idx in range(min(100, len(dataset_val))):  # Validate on 100 samples
-                feat_16_val, corners_val, global_attn_val, padding_mask_val, edges_val = next(dataloader_val_iter)
+            with torch.cuda.amp.autocast(enabled=use_mixed_precision):
+                for val_idx in range(min(100, len(dataset_val))):  # Validate on 100 samples
+                    feat_16_val, corners_val, global_attn_val, padding_mask_val, edges_val = next(dataloader_val_iter)
 
-                feat_16_val = feat_16_val.to(device).float()
-                corners_val = corners_val.to(device).clamp(-1, 1)
-                global_attn_val = global_attn_val.to(device)
-                padding_mask_val = padding_mask_val.to(device)
-                edges_val = edges_val.to(device)
+                    feat_16_val = feat_16_val.to(device).float()
+                    corners_val = corners_val.to(device).clamp(-1, 1)
+                    global_attn_val = global_attn_val.to(device)
+                    padding_mask_val = padding_mask_val.to(device)
+                    edges_val = edges_val.to(device)
 
-                corners_coords_val = corners_val[:, :, :2]
-                semantics_val = corners_val[:, :, 2:]
+                    corners_coords_val = corners_val[:, :, :2]
+                    semantics_val = corners_val[:, :, 2:]
 
-                edges_pred_val, _ = model(corners_coords_val, global_attn_val, padding_mask_val,
-                                          semantics_val, feat_16_val)
+                    edges_pred_val, _ = model(corners_coords_val, global_attn_val, padding_mask_val,
+                                              semantics_val, feat_16_val)
 
-                edges_gt_val = edges_val.squeeze(-1).long()
-                edge_mask_val = global_attn_val.reshape(corners_val.shape[0], -1)
+                    edges_gt_val = edges_val.squeeze(-1).long()
+                    edge_mask_val = global_attn_val.reshape(corners_val.shape[0], -1)
 
-                val_loss = F.cross_entropy(edges_pred_val[edge_mask_val], edges_gt_val[edge_mask_val])
-                val_losses.append(val_loss.item())
+                    val_loss = F.cross_entropy(edges_pred_val[edge_mask_val], edges_gt_val[edge_mask_val])
+                    val_losses.append(val_loss.item())
 
-                # Calculate accuracy
-                edges_pred_class = edges_pred_val.argmax(dim=-1)
-                acc = (edges_pred_class[edge_mask_val] == edges_gt_val[edge_mask_val]).float().mean()
-                val_accs.append(acc.item())
+                    # Calculate accuracy
+                    edges_pred_class = edges_pred_val.argmax(dim=-1)
+                    acc = (edges_pred_class[edge_mask_val] == edges_gt_val[edge_mask_val]).float().mean()
+                    val_accs.append(acc.item())
 
         current_Acc = sum(val_accs) / len(val_accs)
         avg_val_loss = sum(val_losses) / len(val_losses)
