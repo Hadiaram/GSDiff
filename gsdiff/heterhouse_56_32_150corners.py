@@ -53,7 +53,8 @@ class MultiHeadAttention(nn.Module):
         v = self.WV(v).reshape(batch_size, -1, self.heads, self.d_subspace).transpose(1, 2)
         mask = mask[:, None, :, :]
         scores = torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(self.d_subspace)
-        scores = scores.masked_fill(mask == False, -1e9)
+        # Use -1e4 instead of -1e9 for fp16 compatibility (fp16 max is ~65k)
+        scores = scores.masked_fill(mask == False, -1e4)
         scores = F.softmax(scores, dim=-1)
         scores = torch.matmul(scores, v)
         concat = scores.transpose(1, 2).reshape(batch_size, -1, self.d_model)
