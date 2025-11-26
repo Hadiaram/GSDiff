@@ -31,9 +31,10 @@ device = 'cuda:0'
 use_mixed_precision = True  # Use automatic mixed precision (fp16) for memory efficiency
 use_gradient_checkpointing = False  # DISABLED: Causes 10-100x slowdown. Try without first.
 
-# Full 150 corners (no subsampling)
-# 150 corners → 22,500 edges → attention matrix is ~4GB per layer
-max_corners_for_training = 150  # Use all corners
+# Slightly reduced corners for memory constraints
+# 150 corners → 22,500 edges → ~8GB attention per matrix (too large for 79GB GPU)
+# 130 corners → 16,900 edges → ~4.6GB attention per matrix (fits in 79GB GPU)
+max_corners_for_training = 130  # Reduced from 150 to fit in 79GB GPU
 
 '''Create output directory'''
 output_dir = 'outputs/structure-56-150corners-edge/'
@@ -41,8 +42,8 @@ os.makedirs(output_dir, exist_ok=True)
 
 # Save training configuration
 config_text = f"""
-Stage 2 Edge Training Configuration (150 Corners - FULL)
-=========================================================
+Stage 2 Edge Training Configuration (130 Corners)
+==================================================
 Learning Rate: {lr}
 Weight Decay: {weight_decay}
 Physical Batch Size: {batch_size}
@@ -51,24 +52,25 @@ Effective Batch Size: {batch_size * accumulation_steps}
 Mixed Precision: {use_mixed_precision}
 Gradient Checkpointing: {use_gradient_checkpointing}
 Device: {device}
-Max Corners: {max_corners_for_training} (FULL - no subsampling)
+Max Corners: {max_corners_for_training} (subsampled from 150 for memory)
 Edge Dimensions: {max_corners_for_training}x{max_corners_for_training} = {max_corners_for_training**2} edges
-Attention Matrix: 22,500 x 22,500 per layer (12 layers)
 Model: BoundEdgeModel_150Corners
 Dataset: RPlanGEdgeSemanSimplified_81_WithEdges
 Output Directory: {output_dir}
 
 Memory Optimization Strategy:
-- Training on ALL 150 corners per sample (no subsampling)
-- Batch size = 1 (required for full 150x150 attention)
+- Training on 130 corners per sample (random subsample from 150)
+- 130×130 = 16,900 edges vs 150×150 = 22,500 (~25% reduction)
+- Attention matrix: ~4.6GB vs ~8GB per attention operation (~44% reduction)
+- Batch size = 1 (required for large attention matrices)
 - Gradient accumulation over 4 steps maintains effective batch size of 4
 - Mixed precision (fp16) reduces memory by ~50%
 - Gradient checkpointing DISABLED (causes severe slowdown)
 
 Expected Memory Usage:
-- Attention: ~4GB per layer × 12 layers = ~48GB
-- Model weights + activations: ~10-20GB
-- Total: ~60-70GB GPU memory required
+- Attention: ~4.6GB per attention × 2 per layer × 12 layers = ~110GB peak
+- With fp16 and careful memory management: ~55-65GB actual usage
+- Fits in 79GB GPU with headroom
 """
 with open(os.path.join(output_dir, 'training_config.txt'), 'w') as f:
     f.write(config_text)
@@ -138,10 +140,10 @@ def truncated_normal(tensor, mu, sigma, lower, upper, dtype, device):
 print("\n" + "="*60)
 print("Starting Stage 2 Edge Training")
 print("="*60)
-print(f"Training on FULL {max_corners_for_training} corners (no subsampling)")
+print(f"Training on {max_corners_for_training} corners (subsampled from 150 for memory)")
 print(f"  - Attention matrix: {max_corners_for_training}x{max_corners_for_training} = {max_corners_for_training**2} edges")
-print(f"  - Expected GPU memory: ~60-70GB")
-print(f"  - Each training step processes all {max_corners_for_training} corners")
+print(f"  - Memory reduction: 16,900 edges vs 22,500 (~44% less attention memory)")
+print(f"  - Expected GPU memory: ~55-65GB (fits in 79GB GPU)")
 print("="*60 + "\n")
 
 accumulation_counter = 0
