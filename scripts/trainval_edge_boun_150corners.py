@@ -29,7 +29,7 @@ batch_size = 1  # Must be 1 for 150x150=22500 edges (attention matrix is huge!)
 accumulation_steps = 4  # Gradient accumulation to maintain effective batch size of 4
 device = 'cuda:0'
 use_mixed_precision = True  # Use automatic mixed precision (fp16) for memory efficiency
-use_gradient_checkpointing = True  # Trade compute for memory
+use_gradient_checkpointing = False  # DISABLED: Causes 10-100x slowdown. Try without first.
 
 # MEMORY OPTIMIZATION: Subsample corners to reduce O(N²) attention cost
 # 150 corners → 22,500 edges → attention matrix is ~4GB per layer
