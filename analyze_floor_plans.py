@@ -3,7 +3,7 @@
 Floor Plan Corner Analysis Tool
 ================================
 
-This script analyzes GSDiff floor plan data files (.npy format) to:
+This script analyzes GSDiff floor plan data files (.npy or .json format) to:
 1. Count actual corners (excluding padding)
 2. Display corner statistics across dataset
 3. Visualize walls/edges for inspection
@@ -20,6 +20,7 @@ Author: Claude
 import os
 import sys
 import argparse
+import json
 import numpy as np
 from collections import Counter
 import matplotlib.pyplot as plt
@@ -27,11 +28,122 @@ from matplotlib.patches import Circle
 import matplotlib.patches as mpatches
 
 
-def load_floor_plan(file_path):
-    """Load a floor plan .npy file and extract corner/edge information."""
+def load_json_floor_plan(file_path):
+    """Load a floor plan from JSON file and convert to graph format."""
     try:
-        graph = np.load(file_path, allow_pickle=True).item()
-        return graph
+        with open(file_path, 'r') as f:
+            data = json.load(f)
+
+        # Convert JSON to graph format
+        graph = {}
+
+        # Handle different JSON formats
+        if isinstance(data, dict):
+            # Format 1: Direct graph structure (already has corners, edges, etc.)
+            if 'corners' in data or 'vertices' in data or 'junctions' in data:
+                corners_key = 'corners' if 'corners' in data else ('vertices' if 'vertices' in data else 'junctions')
+                corners = data[corners_key]
+
+                # Convert corners to numpy array
+                if isinstance(corners, list):
+                    corners_array = np.array(corners)
+
+                    # Ensure shape is (N, 2) at minimum
+                    if corners_array.ndim == 1:
+                        corners_array = corners_array.reshape(-1, 2)
+
+                    # Add dummy semantics if not present (9 dimensions total: x, y, + 7 semantics)
+                    if corners_array.shape[1] < 9:
+                        num_corners = corners_array.shape[0]
+                        full_array = np.zeros((num_corners, 9))
+                        full_array[:, :corners_array.shape[1]] = corners_array
+                        corners_array = full_array
+
+                    graph['corner_list_np_normalized_padding_withsemantics'] = corners_array
+                    graph['padding_mask'] = np.ones(len(corners_array))  # All real corners
+
+                # Handle edges/walls
+                if 'edges' in data:
+                    edges = data['edges']
+                    if isinstance(edges, list):
+                        # Convert edge list to adjacency matrix
+                        num_corners = len(corners)
+                        edge_matrix = np.zeros((num_corners * num_corners, 1))
+                        for edge in edges:
+                            if isinstance(edge, (list, tuple)) and len(edge) >= 2:
+                                i, j = edge[0], edge[1]
+                                edge_matrix[i * num_corners + j] = 1
+                                edge_matrix[j * num_corners + i] = 1  # Symmetric
+                        graph['edges'] = edge_matrix
+
+            # Format 2: RPLAN-style annotation
+            elif 'boxes' in data or 'lines' in data:
+                # Extract corners from boxes or lines
+                corners_set = set()
+
+                if 'boxes' in data:
+                    for box in data['boxes']:
+                        if isinstance(box, dict):
+                            # Extract corners from bounding box
+                            x, y, w, h = box.get('x', 0), box.get('y', 0), box.get('width', 0), box.get('height', 0)
+                            corners_set.add((x, y))
+                            corners_set.add((x + w, y))
+                            corners_set.add((x, y + h))
+                            corners_set.add((x + w, y + h))
+
+                if 'lines' in data or 'walls' in data:
+                    lines_key = 'lines' if 'lines' in data else 'walls'
+                    for line in data[lines_key]:
+                        if isinstance(line, (list, tuple)) and len(line) >= 4:
+                            corners_set.add((line[0], line[1]))
+                            corners_set.add((line[2], line[3]))
+                        elif isinstance(line, dict):
+                            x1, y1 = line.get('x1', 0), line.get('y1', 0)
+                            x2, y2 = line.get('x2', 0), line.get('y2', 0)
+                            corners_set.add((x1, y1))
+                            corners_set.add((x2, y2))
+
+                if corners_set:
+                    corners_list = sorted(list(corners_set))
+                    corners_array = np.zeros((len(corners_list), 9))
+                    corners_array[:, :2] = np.array(corners_list)
+                    graph['corner_list_np_normalized_padding_withsemantics'] = corners_array
+                    graph['padding_mask'] = np.ones(len(corners_array))
+
+        elif isinstance(data, list):
+            # Format 3: Direct list of corners
+            corners_array = np.array(data)
+            if corners_array.ndim == 1:
+                corners_array = corners_array.reshape(-1, 2)
+
+            if corners_array.shape[1] < 9:
+                num_corners = corners_array.shape[0]
+                full_array = np.zeros((num_corners, 9))
+                full_array[:, :corners_array.shape[1]] = corners_array
+                corners_array = full_array
+
+            graph['corner_list_np_normalized_padding_withsemantics'] = corners_array
+            graph['padding_mask'] = np.ones(len(corners_array))
+
+        return graph if graph else None
+
+    except Exception as e:
+        print(f"Error loading JSON {file_path}: {e}")
+        return None
+
+
+def load_floor_plan(file_path):
+    """Load a floor plan from .npy or .json file and extract corner/edge information."""
+    try:
+        # Detect file type
+        if file_path.endswith('.json'):
+            return load_json_floor_plan(file_path)
+        elif file_path.endswith('.npy'):
+            graph = np.load(file_path, allow_pickle=True).item()
+            return graph
+        else:
+            print(f"Unsupported file format: {file_path}")
+            return None
     except Exception as e:
         print(f"Error loading {file_path}: {e}")
         return None
@@ -130,16 +242,17 @@ def analyze_dataset(data_path, num_samples=None, visualize=False):
         print(f"Error: Path '{data_path}' does not exist")
         return
 
-    # Get all .npy files
+    # Get all .npy and .json files
     if os.path.isfile(data_path):
         files = [data_path]
         data_dir = os.path.dirname(data_path)
     else:
-        files = [os.path.join(data_path, f) for f in os.listdir(data_path) if f.endswith('.npy')]
+        files = [os.path.join(data_path, f) for f in os.listdir(data_path)
+                 if f.endswith('.npy') or f.endswith('.json')]
         data_dir = data_path
 
     if not files:
-        print(f"No .npy files found in {data_path}")
+        print(f"No .npy or .json files found in {data_path}")
         return
 
     # Sort files
@@ -226,27 +339,39 @@ def analyze_dataset(data_path, num_samples=None, visualize=False):
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Analyze GSDiff floor plan corner counts and visualize walls',
+        description='Analyze floor plan corner counts and visualize walls (supports .npy and .json)',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Analyze all files in training set
+  # Analyze all .npy files in training set
   python analyze_floor_plans.py ./datasets/rplang-v3-withsemantics/train
 
-  # Analyze first 100 files
+  # Analyze first 100 files (both .npy and .json)
   python analyze_floor_plans.py ./datasets/rplang-v3-withsemantics/train --num-samples 100
 
   # Analyze and visualize 10 samples
   python analyze_floor_plans.py ./datasets/rplang-v3-withsemantics/val --num-samples 10 --visualize
 
-  # Analyze single file with visualization
+  # Analyze single .npy file with visualization
   python analyze_floor_plans.py ./datasets/rplang-v3-withsemantics/train/0.npy --visualize
+
+  # Analyze JSON files
+  python analyze_floor_plans.py ./my_floor_plans/ --visualize
+
+  # Analyze single JSON file
+  python analyze_floor_plans.py ./my_floor_plan.json --visualize
+
+Supported JSON formats:
+  1. {"corners": [[x1,y1], [x2,y2], ...], "edges": [[i,j], ...]}
+  2. {"vertices": [[x1,y1], ...], "edges": [...]}
+  3. {"boxes": [...], "lines": [...]} (RPLAN-style)
+  4. [[x1,y1], [x2,y2], ...] (direct corner list)
         """
     )
 
     parser.add_argument(
         'data_path',
-        help='Path to dataset directory or single .npy file'
+        help='Path to dataset directory or single .npy/.json file'
     )
 
     parser.add_argument(

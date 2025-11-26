@@ -2,12 +2,15 @@
 
 A standalone tool for analyzing GSDiff floor plan datasets. This script helps you understand the corner distribution in your training data and visualize floor plan structures.
 
+**Supports both .npy and .json file formats!**
+
 ## Features
 
 - **Count corners**: Analyzes actual corners (excluding padding) in each floor plan
 - **Statistics**: Provides min/max/mean/median corner counts across dataset
 - **Distribution**: Shows corner count distribution to identify data patterns
 - **Visualization**: Displays floor plans with corners and walls/edges
+- **Multi-format**: Works with both .npy (GSDiff format) and .json files
 
 ## Requirements
 
@@ -46,7 +49,19 @@ python analyze_floor_plans.py ./datasets/rplang-v3-withsemantics/val --num-sampl
 Analyze and visualize a specific floor plan:
 
 ```bash
+# .npy file
 python analyze_floor_plans.py ./datasets/rplang-v3-withsemantics/train/0.npy --visualize
+
+# .json file
+python analyze_floor_plans.py ./my_floor_plan.json --visualize
+```
+
+### JSON File Analysis
+
+Analyze a directory of JSON floor plans:
+
+```bash
+python analyze_floor_plans.py ./my_json_floor_plans/ --num-samples 10 --visualize
 ```
 
 ## Output Example
@@ -83,12 +98,43 @@ When using `--visualize`, the tool displays interactive plots showing:
 - **Blue lines**: Walls/edges connecting corners
 - **Numbers**: Corner indices for reference
 
-## Data Format
+## Data Formats
+
+### .npy Format (GSDiff)
 
 This tool works with GSDiff `.npy` files containing:
 - `corner_list_np_normalized_padding_withsemantics`: Corner coordinates and semantics
 - `padding_mask`: Identifies real vs padded corners
 - `edges`: Adjacency matrix for wall connections (optional)
+
+### .json Format
+
+The tool automatically detects and supports multiple JSON formats:
+
+**Format 1: Direct graph structure**
+```json
+{
+  "corners": [[x1, y1], [x2, y2], ...],
+  "edges": [[i, j], [k, l], ...]
+}
+```
+or use `"vertices"` or `"junctions"` instead of `"corners"`
+
+**Format 2: RPLAN-style annotations**
+```json
+{
+  "boxes": [{"x": 10, "y": 20, "width": 50, "height": 30}, ...],
+  "lines": [[x1, y1, x2, y2], ...]
+}
+```
+or use `"walls"` instead of `"lines"`
+
+**Format 3: Simple corner list**
+```json
+[[x1, y1], [x2, y2], [x3, y3], ...]
+```
+
+The tool automatically extracts corners from whichever format you use!
 
 ## Use Cases
 
