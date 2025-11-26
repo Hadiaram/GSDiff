@@ -90,13 +90,29 @@ Example files by corner count:
   147 corners: 589.npy
 ```
 
-## Visualization
+## Visualization-Driven Counting
+
+**Important:** When using `--visualize`, the tool uses a **visualization-first approach**:
+
+1. **Visualizes each floor plan first** - Shows you exactly what will be counted
+2. **Counts displayed corners** - Uses the corners actually shown in the visualization
+3. **Compares counts** - Alerts you if raw count differs from displayed count
+
+This ensures you see exactly what you're counting, eliminating confusion about padding, filtering, or data issues.
+
+### What You'll See
 
 When using `--visualize`, the tool displays interactive plots showing:
 - **Red circles**: Corners without semantic information
 - **Green circles**: Corners with semantic labels
 - **Blue lines**: Walls/edges connecting corners
 - **Numbers**: Corner indices for reference
+- **Title shows**: Displayed corner count, semantics count, and edge count
+
+If the raw data count differs from what's displayed, you'll see a warning:
+```
+Note: Raw count (150) differs from displayed count (127)
+```
 
 ## Data Formats
 

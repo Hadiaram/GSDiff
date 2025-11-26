@@ -165,12 +165,17 @@ def count_actual_corners(graph):
         return 0
 
 
-def visualize_floor_plan(graph, title="Floor Plan"):
-    """Visualize floor plan with corners and edges."""
+def visualize_floor_plan(graph, title="Floor Plan", return_count=True):
+    """Visualize floor plan with corners and edges.
+
+    Returns:
+        int: Number of corners actually displayed (if return_count=True)
+        None: If return_count=False
+    """
     corners = graph.get('corner_list_np_normalized_padding_withsemantics', None)
     if corners is None:
         print("No corner data found for visualization")
-        return
+        return 0 if return_count else None
 
     padding_mask = graph.get('padding_mask', np.ones(len(corners)))
     edges = graph.get('edges', None)
@@ -178,6 +183,9 @@ def visualize_floor_plan(graph, title="Floor Plan"):
     # Filter out padding corners
     valid_indices = np.where(padding_mask == 1)[0]
     valid_corners = corners[valid_indices, :2]  # Extract x, y coordinates
+
+    # THIS IS THE ACTUAL COUNT - based on what will be displayed
+    displayed_corner_count = len(valid_corners)
 
     # Convert from normalized [-1, 1] to pixel coordinates for visualization
     # Assuming original range was [0, 256]
@@ -188,6 +196,9 @@ def visualize_floor_plan(graph, title="Floor Plan"):
     ax.set_ylim(0, 256)
     ax.set_aspect('equal')
     ax.invert_yaxis()  # Match image coordinates (y increases downward)
+
+    # Count edges for display
+    edge_count = 0
 
     # Draw edges if available
     if edges is not None and len(edges) > 0:
@@ -208,8 +219,10 @@ def visualize_floor_plan(graph, title="Floor Plan"):
                         x1, y1 = coords[np.where(valid_indices == i)[0][0]]
                         x2, y2 = coords[np.where(valid_indices == j)[0][0]]
                         ax.plot([x1, x2], [y1, y2], 'b-', linewidth=2, alpha=0.6)
+                        edge_count += 1
 
     # Draw corners
+    corners_with_semantics = 0
     for idx, (x, y) in enumerate(coords):
         # Different colors for different semantic types (if available)
         color = 'red'
@@ -218,11 +231,20 @@ def visualize_floor_plan(graph, title="Floor Plan"):
             semantics = corners[valid_indices[idx], 2:]
             if np.any(semantics > 0):
                 color = 'green'  # Has semantic information
+                corners_with_semantics += 1
 
         ax.add_patch(Circle((x, y), 3, color=color, alpha=0.8))
         ax.text(x + 5, y - 5, str(idx), fontsize=8, color='black')
 
-    ax.set_title(f"{title}\nTotal Corners: {len(coords)}")
+    # Enhanced title with detailed counts
+    title_text = f"{title}\n"
+    title_text += f"Displayed Corners: {displayed_corner_count}"
+    if corners_with_semantics > 0:
+        title_text += f" ({corners_with_semantics} with semantics)"
+    if edge_count > 0:
+        title_text += f"\nEdges/Walls: {edge_count}"
+
+    ax.set_title(title_text, fontsize=12, fontweight='bold')
     ax.set_xlabel("X Coordinate")
     ax.set_ylabel("Y Coordinate")
 
@@ -234,6 +256,9 @@ def visualize_floor_plan(graph, title="Floor Plan"):
 
     plt.tight_layout()
     plt.show()
+
+    # Return the count of corners that were actually displayed
+    return displayed_corner_count if return_count else None
 
 
 def analyze_dataset(data_path, num_samples=None, visualize=False):
@@ -276,7 +301,26 @@ def analyze_dataset(data_path, num_samples=None, visualize=False):
         if graph is None:
             continue
 
-        num_corners = count_actual_corners(graph)
+        # When visualizing, get corner count from visualization
+        # Otherwise use standard counting
+        if visualize and (num_samples is None or i < num_samples):
+            # Visualize first, get the displayed count
+            print(f"\n{'='*70}")
+            print(f"Visualizing: {os.path.basename(file_path)}")
+            print(f"{'='*70}")
+            num_corners = visualize_floor_plan(
+                graph,
+                title=f"{os.path.basename(file_path)}",
+                return_count=True
+            )
+            # Also get raw count for comparison
+            raw_count = count_actual_corners(graph)
+            if raw_count != num_corners:
+                print(f"\nNote: Raw count ({raw_count}) differs from displayed count ({num_corners})")
+        else:
+            # Just count without visualizing
+            num_corners = count_actual_corners(graph)
+
         corner_counts.append(num_corners)
 
         file_details.append({
@@ -285,8 +329,8 @@ def analyze_dataset(data_path, num_samples=None, visualize=False):
             'graph': graph
         })
 
-        # Print progress every 1000 files
-        if (i + 1) % 1000 == 0:
+        # Print progress every 1000 files (only when not visualizing each one)
+        if not visualize and (i + 1) % 1000 == 0:
             print(f"Processed {i + 1} files...")
 
     # Statistics
@@ -317,22 +361,12 @@ def analyze_dataset(data_path, num_samples=None, visualize=False):
                 example = matching[0]
                 print(f"  {target_count} corners: {example['file']}")
 
-        # Visualize samples if requested
+        # Note about visualization
         if visualize:
-            print(f"\nVisualizing sample floor plans...")
-
-            # Show 3-5 samples with different corner counts
-            samples_to_visualize = []
-            for target_count in counts_to_show[:3]:
-                matching = [d for d in file_details if d['corners'] == target_count]
-                if matching:
-                    samples_to_visualize.append(matching[0])
-
-            for sample in samples_to_visualize:
-                visualize_floor_plan(
-                    sample['graph'],
-                    title=f"{sample['file']} - {sample['corners']} corners"
-                )
+            print(f"\n✓ All files were visualized during analysis")
+            print(f"  Corner counts shown above are based on displayed corners")
+        else:
+            print(f"\nTip: Use --visualize to see floor plans and verify corner counts")
     else:
         print("No valid floor plans found")
 
@@ -384,7 +418,7 @@ Supported JSON formats:
     parser.add_argument(
         '--visualize', '-v',
         action='store_true',
-        help='Visualize sample floor plans with corners and edges'
+        help='Visualize floor plans FIRST, then count displayed corners (visualization-driven counting)'
     )
 
     args = parser.parse_args()
